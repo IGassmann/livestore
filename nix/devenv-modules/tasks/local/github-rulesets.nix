@@ -33,12 +33,8 @@
             | if .type == "pull_request" then
                 .parameters |= (
                   del(.allowed_merge_methods)
+                  | del(.dismissal_restriction | select(.enabled == false and (.allowed_actors // []) == []))
                   | del(.required_reviewers)
-                  | if .dismissal_restriction == { allowed_actors: [], enabled: false } then
-                      del(.dismissal_restriction)
-                    else
-                      .
-                    end
                 )
               else
                 .
