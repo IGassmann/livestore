@@ -27,7 +27,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm test-app',
+    command: 'vp run test-app',
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
   },
