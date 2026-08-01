@@ -1,7 +1,7 @@
 import type * as otel from '@opentelemetry/api'
 
 import type { BootStatus, BootWarningReason, LogConfig, SqliteDb, SyncOptions } from '@livestore/common'
-import { Devtools, UnknownError } from '@livestore/common'
+import { Devtools, StateHead, UnknownError } from '@livestore/common'
 import type { DevtoolsOptions, StreamEventsOptions } from '@livestore/common/leader-thread'
 import {
   configureConnection,
@@ -10,8 +10,7 @@ import {
   makeLeaderThreadLayer,
   streamEventsWithSyncState,
 } from '@livestore/common/leader-thread'
-import type { LiveStoreSchema } from '@livestore/common/schema'
-import { LiveStoreEvent } from '@livestore/common/schema'
+import { LiveStoreEvent, type LiveStoreSchema } from '@livestore/common/schema'
 import { sqliteDbFactory } from '@livestore/sqlite-wasm/browser'
 import { loadSqlite3Wasm } from '@livestore/sqlite-wasm/load-wasm'
 import { isDevEnv, LS_DEV } from '@livestore/utils'
@@ -77,8 +76,7 @@ export const makeWorkerEffect = (options: WorkerOptions) => {
   )
 
   return makeWorkerRunnerOuter(options).pipe(
-    Effect.provide(RpcServer.layerProtocolWorkerRunner),
-    Effect.provide(BrowserWorkerRunner.layer),
+    Effect.provide(Layer.provideMerge(RpcServer.layerProtocolWorkerRunner, BrowserWorkerRunner.layer)),
     Effect.scoped,
     Effect.tapCauseLogPretty,
     Effect.annotateLogs({ thread: self.name }),
@@ -93,30 +91,32 @@ export const makeWorkerEffect = (options: WorkerOptions) => {
   )
 }
 
-const makeWorkerRunnerOuter = (workerOptions: WorkerOptions) =>
-  Effect.gen(function* () {
-    // Port coming from client session and forwarded via the shared worker.
-    const {
-      port: incomingRequestsPort,
-      storeId,
-      clientId,
-    } = yield* RpcWorker.initialMessage(WorkerSchema.LeaderWorkerOuterInitialMessage.payloadSchema)
+const makeWorkerRunnerOuter = Effect.fn('@livestore/adapter-web:worker:wrapper:InitialMessage')(function* (
+  workerOptions: WorkerOptions,
+) {
+  // Port coming from client session and forwarded via the shared worker.
+  const {
+    port: incomingRequestsPort,
+    storeId,
+    clientId,
+  } = yield* RpcWorker.initialMessage(WorkerSchema.LeaderWorkerOuterInitialMessage.payloadSchema)
 
-    return yield* RpcServer.make(WorkerSchema.LeaderWorkerInnerRpcs).pipe(
-      Effect.provide(makeWorkerRunnerInner(workerOptions)),
-      Effect.provide(makeMessagePortRpcServerProtocol(incomingRequestsPort)),
-      Effect.withSpan('@livestore/adapter-web:worker:wrapper:InitialMessage:innerFiber'),
-      Effect.tapCauseLogPretty,
-      Effect.provide(
-        Layer.mergeAll(
-          Opfs.layer,
-          WebmeshWorker.CacheService.layer({
-            nodeName: Devtools.makeNodeName.client.leader({ storeId, clientId }),
-          }),
-        ),
+  return yield* RpcServer.make(WorkerSchema.LeaderWorkerInnerRpcs).pipe(
+    Effect.provide(
+      Layer.provideMerge(makeWorkerRunnerInner(workerOptions), makeMessagePortRpcServerProtocol(incomingRequestsPort)),
+    ),
+    Effect.withSpan('@livestore/adapter-web:worker:wrapper:InitialMessage:innerFiber'),
+    Effect.tapCauseLogPretty,
+    Effect.provide(
+      Layer.mergeAll(
+        Opfs.layer,
+        WebmeshWorker.CacheService.layer({
+          nodeName: Devtools.makeNodeName.client.leader({ storeId, clientId }),
+        }),
       ),
-    )
-  }).pipe(Effect.withSpan('@livestore/adapter-web:worker:wrapper:InitialMessage'))
+    ),
+  )
+})
 
 const makeMessagePortRpcServerProtocol = (port: MessagePort): Layer.Layer<RpcServer.Protocol> =>
   Layer.effect(
@@ -280,7 +280,7 @@ const makeWorkerRunnerInner = ({ schema, sync: syncOptions, syncPayloadSchema }:
               syncPayloadEncoded,
               syncPayloadSchema: syncPayloadSchema as Schema.Decoder<Schema.Json, never> | undefined,
               ...(bootWarning !== undefined ? { bootWarning } : {}),
-            }),
+            }).pipe(Layer.provide(StateHead.layer({ dbState }))),
             leaderThreadScope,
           )
         }).pipe(

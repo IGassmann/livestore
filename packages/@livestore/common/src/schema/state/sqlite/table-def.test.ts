@@ -1,6 +1,7 @@
+import { TestSchema } from 'effect/testing'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import { Schema, SchemaAST, SchemaTransformation, TestSchema } from '@livestore/utils/effect'
+import { Schema, SchemaAST, SchemaTransformation } from '@livestore/utils/effect'
 
 import { State } from '../../mod.ts'
 
@@ -483,7 +484,7 @@ describe('table function overloads', () => {
 
   it('supports discriminated unions with parsed JSON payloads', () => {
     const CircleDataSchema = Schema.Struct({
-      radius: Schema.Number,
+      radius: Schema.Finite,
     })
     const CircleSchema = Schema.Struct({
       kind: Schema.Literal('circle'),
@@ -491,7 +492,7 @@ describe('table function overloads', () => {
     })
 
     const SquareDataSchema = Schema.Struct({
-      sideLength: Schema.Number,
+      sideLength: Schema.Finite,
     })
     const SquareSchema = Schema.Struct({
       kind: Schema.Literal('square'),

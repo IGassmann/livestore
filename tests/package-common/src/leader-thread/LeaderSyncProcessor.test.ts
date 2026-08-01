@@ -8,6 +8,7 @@ import {
   makeMockSyncBackend,
   type RejectedPushError,
   ServerAheadError,
+  StateHead,
   StaleRebaseGenerationError,
   type SyncBackend,
   type SyncOptions,
@@ -105,13 +106,50 @@ Vitest.describe.concurrent('LeaderSyncProcessor', { timeout: 60000 }, () => {
       )
 
       const result = leaderThreadCtx.dbState.select(tables.todos.asSql().query)
+      const syncState = yield* leaderThreadCtx.syncProcessor.syncState.get
 
       expect(result).toEqual([
         { id: '1', text: 't1', completed: 0, deletedAt: null },
         { id: '2', text: 't2', completed: 0, deletedAt: null },
       ])
+      expect(yield* StateHead.make({ dbState: leaderThreadCtx.dbState }).get).toEqual(syncState.localHead)
 
       yield* testContext.mockSyncBackend.pushedEvents.pipe(Stream.take(2), Stream.runDrain)
+    }).pipe(withTestCtx()(test)),
+  )
+
+  Vitest.live('retains leader materialization metadata for pending local events', (test) =>
+    Effect.gen(function* () {
+      const leaderThreadCtx = yield* LeaderThreadCtx
+      const testContext = yield* TestContext
+      const sourceSessionChangeset = Uint8Array.from([255])
+
+      yield* testContext.mockSyncBackend.disconnect
+
+      const localEvent = new LiveStoreEvent.Client.EncodedWithMeta({
+        ...LiveStoreEvent.Global.toClientEncoded(
+          testContext.eventFactory.todoCreated.next({ id: 'local', text: 'local', completed: false }),
+        ),
+      })
+      localEvent.meta.sessionChangeset = {
+        _tag: 'sessionChangeset',
+        data: sourceSessionChangeset,
+        debug: undefined,
+      }
+
+      yield* leaderThreadCtx.syncProcessor.push([localEvent])
+
+      const downstreamItem = yield* Queue.take(testContext.pullQueue)
+      assert(downstreamItem.payload._tag === 'upstream-advance')
+
+      const retainedEvent = (yield* leaderThreadCtx.syncProcessor.syncState.get).pending[0]!
+      const publishedEvent = downstreamItem.payload.newEvents[0]!
+      assert(retainedEvent.meta.sessionChangeset._tag === 'sessionChangeset')
+      assert(publishedEvent.meta.sessionChangeset._tag === 'sessionChangeset')
+
+      expect([...retainedEvent.meta.sessionChangeset.data]).toEqual([...publishedEvent.meta.sessionChangeset.data])
+      expect([...retainedEvent.meta.sessionChangeset.data]).not.toEqual([...sourceSessionChangeset])
+      expect(retainedEvent.meta.materializerHashLeader).toEqual(publishedEvent.meta.materializerHashLeader)
     }).pipe(withTestCtx()(test)),
   )
 
@@ -369,6 +407,9 @@ Vitest.describe.concurrent('LeaderSyncProcessor', { timeout: 60000 }, () => {
         { id: '1', text: 't1', completed: 0, deletedAt: null },
         { id: '2', text: 't2', completed: 0, deletedAt: null },
       ])
+
+      const syncState = yield* leaderThreadCtx.syncProcessor.syncState.get
+      expect(yield* StateHead.make({ dbState: leaderThreadCtx.dbState }).get).toEqual(syncState.localHead)
 
       const queueResults = yield* Queue.clear(testContext.pullQueue)
       expect(queueResults[0]!.payload._tag).toEqual('upstream-advance')
@@ -851,6 +892,8 @@ const LeaderThreadCtxLive = ({
     const shutdownProxy =
       captureShutdown === true ? yield* WebChannel.queueChannelProxy({ schema: Shutdown.All }) : undefined
 
+    const dbState = yield* makeSqliteDb({ _tag: 'in-memory' })
+    const dbEventlog = yield* makeSqliteDb({ _tag: 'in-memory' })
     const leaderContextLayer = makeLeaderThreadLayer({
       schema,
       storeId: 'test',
@@ -868,15 +911,15 @@ const LeaderThreadCtxLive = ({
           initialSyncOptions: syncOptions?.initialSyncOptions,
         }),
       },
-      dbState: yield* makeSqliteDb({ _tag: 'in-memory' }),
-      dbEventlog: yield* makeSqliteDb({ _tag: 'in-memory' }),
+      dbState,
+      dbEventlog,
       devtoolsOptions: { enabled: false },
       shutdownChannel: shutdownProxy?.webChannel ?? (yield* WebChannel.noopChannel<any, any>()),
       testing: {
         ...omitUndefineds({ syncProcessor }),
       },
       ...omitUndefineds({ params }),
-    }).pipe(Layer.provide(FetchHttpClient.layer))
+    }).pipe(Layer.provide(StateHead.layer({ dbState })), Layer.provide(FetchHttpClient.layer))
 
     const testContextLayer = Effect.gen(function* () {
       const leaderThreadCtx = yield* LeaderThreadCtx

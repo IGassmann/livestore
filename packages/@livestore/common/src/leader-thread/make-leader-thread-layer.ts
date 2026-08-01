@@ -9,6 +9,7 @@ import {
   Layer,
   Option,
   Queue,
+  ReadonlyArray,
   Schema,
   Stream,
   Subscribable,
@@ -26,6 +27,7 @@ import type { MigrationsReport } from '../defs.ts'
 import type * as Devtools from '../devtools/mod.ts'
 import type { LiveStoreSchema } from '../schema/mod.ts'
 import { EventSequenceNumber, LiveStoreEvent, SystemTables } from '../schema/mod.ts'
+import type * as StateHead from '../StateHead.ts'
 import type { SyncBackend, SyncOptions } from '../sync/sync.ts'
 import { SyncState } from '../sync/syncstate.ts'
 import { sql } from '../util.ts'
@@ -87,7 +89,11 @@ export const makeLeaderThreadLayer = ({
   bootWarning,
   params,
   testing,
-}: MakeLeaderThreadLayerParams): Layer.Layer<LeaderThreadCtx, UnknownError, Scope.Scope | HttpClient.HttpClient> =>
+}: MakeLeaderThreadLayerParams): Layer.Layer<
+  LeaderThreadCtx,
+  UnknownError,
+  Scope.Scope | HttpClient.HttpClient | StateHead.StateHead
+> =>
   Effect.gen(function* () {
     const syncPayloadDecoded =
       syncPayloadEncoded === undefined
@@ -244,24 +250,12 @@ export const makeLeaderThreadLayer = ({
 
 const hasEventlogTables = (db: SqliteDb) => {
   const tableNames = new Set(db.select<{ name: string }>(sql`select name from sqlite_master`).map((_) => _.name))
-  const eventlogTables = new Set(SystemTables.eventlogSystemTables.map((_) => _.sqliteDef.name))
-  return isSubsetOf(eventlogTables, tableNames)
+  return ReadonlyArray.every(SystemTables.eventlogSystemTables, (_) => tableNames.has(_.sqliteDef.name))
 }
 
 const hasStateTables = (db: SqliteDb) => {
   const tableNames = new Set(db.select<{ name: string }>(sql`select name from sqlite_master`).map((_) => _.name))
-  const stateTables = new Set(SystemTables.stateSystemTables.map((_) => _.sqliteDef.name))
-  return isSubsetOf(stateTables, tableNames)
-}
-
-const isSubsetOf = (a: Set<string>, b: Set<string>): boolean => {
-  for (const item of a) {
-    if (b.has(item) === false) {
-      return false
-    }
-  }
-
-  return true
+  return ReadonlyArray.every(SystemTables.stateSystemTables, (_) => tableNames.has(_.sqliteDef.name))
 }
 
 const getInitialSyncState = ({

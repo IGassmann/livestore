@@ -16,6 +16,8 @@ import {
   prepareBindValues,
   QueryBuilderAstSymbol,
   resolveSessionIdSymbolInBindValues,
+  SqliteDbHelper,
+  StateHead,
   type StorageMode,
   type SyncState,
   UnknownError,
@@ -207,12 +209,13 @@ export class Store<TSchema extends LiveStoreSchema = LiveStoreSchema.Any, TConte
     this.storageMode = clientSession.leaderThread.initialState.storageMode
 
     const reactivityGraph = makeReactivityGraph()
+    const stateHead = StateHead.make({ dbState: clientSession.sqliteDb })
 
     const syncProcessor = makeClientSessionSyncProcessor({
       schema,
       clientSession,
       materializeEvent: Effect.fn('client-session-sync-processor:materialize-event')(
-        (eventEncoded, { withChangeset, materializerHashLeader }) =>
+        (eventEncoded, { materializerHashLeader }) =>
           // We need to use `Effect.gen` (even though we're using `Effect.fn`) so that we can pass `this` to the function
           Effect.gen({ self: this }, function* () {
             const resolution = yield* resolveEventDef(schema, {
@@ -223,6 +226,7 @@ export class Store<TSchema extends LiveStoreSchema = LiveStoreSchema.Any, TConte
             if (resolution._tag === 'unknown') {
               // Runtime schema doesn't know this event yet; skip materialization but
               // keep the log entry so upgraded clients can replay it later.
+              yield* stateHead.set(eventEncoded.seqNum)
               return {
                 writeTables: new Set<string>(),
                 sessionChangeset: { _tag: 'no-op' as const },
@@ -287,18 +291,14 @@ export class Store<TSchema extends LiveStoreSchema = LiveStoreSchema.Any, TConte
               }
             }
 
-            let sessionChangeset:
-              | { _tag: 'sessionChangeset'; data: Uint8Array<ArrayBuffer>; debug: any }
-              | { _tag: 'no-op' }
-              | { _tag: 'unset' } = { _tag: 'unset' }
-            if (withChangeset === true) {
-              sessionChangeset = this[StoreInternalsSymbol].sqliteDbWrapper.withChangeset(exec).changeset
-            } else {
-              exec()
-            }
+            const sessionChangeset = this[StoreInternalsSymbol].sqliteDbWrapper.withChangeset(exec).changeset
+            yield* stateHead.set(eventEncoded.seqNum)
 
             return { writeTables: writeTablesForEvent, sessionChangeset, materializerHash }
-          }).pipe(Effect.mapError((cause) => MaterializeError.make({ cause }))),
+          }).pipe(
+            SqliteDbHelper.withSavepoint(clientSession.sqliteDb),
+            Effect.mapError((cause) => MaterializeError.make({ cause })),
+          ),
       ),
       rollback: (changeset) => {
         this[StoreInternalsSymbol].sqliteDbWrapper.rollback(changeset)
@@ -316,12 +316,9 @@ export class Store<TSchema extends LiveStoreSchema = LiveStoreSchema.Any, TConte
         ...omitUndefineds({
           leaderPushBatchSize: params.leaderPushBatchSize,
         }),
-        ...(params.simulation?.clientSessionSyncProcessor !== undefined
-          ? { simulation: params.simulation.clientSessionSyncProcessor }
-          : {}),
       },
       confirmUnsavedChanges,
-    }).pipe(Effect.runSyncWith(effectContext.services))
+    }).pipe(Effect.provideService(StateHead.StateHead, stateHead), Effect.runSyncWith(effectContext.services))
 
     // TODO generalize the `tableRefs` concept to allow finer-grained refs
     const tableRefs: { [key: string]: Ref<null, ReactivityGraphContext, RefreshReason> } = {}
@@ -659,7 +656,7 @@ export class Store<TSchema extends LiveStoreSchema = LiveStoreSchema.Any, TConte
     Stream.callback<TResult>((emit) =>
       Effect.gen({ self: this }, function* () {
         const otelSpan = yield* OtelTracer.currentOtelSpan.pipe(
-          Effect.catchTag('NoSuchElementError', () => Effect.succeed(undefined)),
+          Effect.catchTag('NoSuchElementError', () => Effect.void),
         )
         const otelContext =
           otelSpan !== undefined ? otel.trace.setSpan(otel.context.active(), otelSpan) : otel.context.active()

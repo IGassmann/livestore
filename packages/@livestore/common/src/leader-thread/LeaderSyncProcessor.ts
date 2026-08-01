@@ -27,13 +27,14 @@ import {
   TxQueue,
 } from '@livestore/utils/effect'
 
-import { type MaterializeError, type SqliteDb, UnknownError } from '../adapter-types.ts'
+import { MaterializeError, type SqliteDb, UnknownError } from '../adapter-types.ts'
 import type { UnknownEventError } from '../errors.ts'
 import { IntentionalShutdownCause } from '../errors.ts'
 import { makeMaterializerHash } from '../materializer-helper.ts'
 import type { LiveStoreSchema } from '../schema/mod.ts'
 import { EventSequenceNumber, LiveStoreEvent, resolveEventDef, SystemTables } from '../schema/mod.ts'
 import { EVENTLOG_META_TABLE, SYNC_STATUS_TABLE } from '../schema/state/sqlite/system-tables/eventlog-tables.ts'
+import * as StateHead from '../StateHead.ts'
 import type { BackendIdMismatchError, IsOfflineError, SyncBackend } from '../sync/sync.ts'
 import * as SyncState from '../sync/syncstate.ts'
 import { sql } from '../util.ts'
@@ -210,6 +211,7 @@ export const make = Effect.fnUntraced(function* ({
   params,
   testing,
 }: Options) {
+  const stateHead = yield* StateHead.StateHead
   const syncBackendPushQueue = yield* TxQueue.unbounded<LiveStoreEvent.Client.EncodedWithMeta>()
   const localPushBatchSize = params.localPushBatchSize ?? 10
   const backendPushBatchSize = params.backendPushBatchSize ?? 50
@@ -372,10 +374,20 @@ export const make = Effect.fnUntraced(function* ({
           }
         }
 
+        // For a local-push advance, `newEvents` and the appended pending suffix describe the same logical
+        // events but serve different roles and may be distinct instances. Materialize the retained pending
+        // instances so their rollback metadata remains available if a later backend event causes a rebase.
+        const acceptedPendingEvents = mergeResult.newSyncState.pending.slice(syncState.pending.length)
+        if (acceptedPendingEvents.length !== mergeResult.newEvents.length) {
+          return yield* Effect.dieDebugger('Local push events must be retained in pending state')
+        }
+
+        yield* materializeEventsBatch({ batchItems: acceptedPendingEvents, deferreds })
+
         yield* SubscriptionRef.set(syncStateSref, mergeResult.newSyncState)
 
         yield* connectedClientSessionPullQueues.offer({
-          payload: SyncState.PayloadUpstreamAdvance.make({ newEvents: mergeResult.newEvents }),
+          payload: SyncState.PayloadUpstreamAdvance.make({ newEvents: acceptedPendingEvents }),
           leaderHead: mergeResult.newSyncState.localHead,
         })
 
@@ -385,11 +397,9 @@ export const make = Effect.fnUntraced(function* ({
         })
 
         // Don't sync client-only events
-        const globalOrUnknownEvents = mergeResult.newEvents.filter((e) => !isClientOnlyEvent(e))
+        const globalOrUnknownEvents = acceptedPendingEvents.filter((e) => !isClientOnlyEvent(e))
 
         yield* TxQueue.offerAll(syncBackendPushQueue, globalOrUnknownEvents)
-
-        yield* materializeEventsBatch({ batchItems: mergeResult.newEvents, deferreds })
       }).pipe(localPushBackendPullMutex.withPermits(1))
     }
   })
@@ -482,6 +492,9 @@ export const make = Effect.fnUntraced(function* ({
                 dbEventlog,
                 eventNumsToRollback: mergeResult.rollbackEvents.map((_) => _.seqNum),
               })
+              yield* stateHead
+                .set(mergeResult.rollbackEvents[0]!.parentSeqNum)
+                .pipe(Effect.mapError((cause) => MaterializeError.make({ cause })))
             }
 
             yield* connectedClientSessionPullQueues.offer({

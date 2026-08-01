@@ -5,6 +5,7 @@ import {
   type LockStatus,
   makeClientSession,
   migrateDb,
+  StateHead,
   type SyncOptions,
   UnknownError,
 } from '@livestore/common'
@@ -137,8 +138,12 @@ export const makeInMemoryAdapter =
       const sharedWorkerClient =
         sharedWebWorker !== undefined
           ? yield* RpcClient.make(WorkerSchema.SharedWorkerRpcs).pipe(
-              Effect.provide(RpcClient.layerProtocolWorker({ size: 1, concurrency: 100 })),
-              Effect.provide(BrowserWorker.layer(() => sharedWebWorker)),
+              Effect.provide(
+                Layer.provideMerge(
+                  RpcClient.layerProtocolWorker({ size: 1, concurrency: 100 }),
+                  BrowserWorker.layer(() => sharedWebWorker),
+                ),
+              ),
               Effect.tapCauseLogPretty,
               UnknownError.mapToUnknownError,
             )
@@ -268,7 +273,7 @@ const makeLeaderThread = ({
         shutdownChannel,
         syncPayloadEncoded,
         syncPayloadSchema: syncPayloadSchema as Schema.Decoder<Schema.Json, never> | undefined,
-      }),
+      }).pipe(Layer.provide(StateHead.layer({ dbState }))),
     )
 
     return yield* Effect.gen(function* () {

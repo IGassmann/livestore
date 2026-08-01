@@ -46,8 +46,8 @@ export interface ClientSession {
 export type ResetMode = 'all-data' | 'only-app-db'
 
 export const BootStateProgress = Schema.Struct({
-  done: Schema.Number,
-  total: Schema.Number,
+  done: Schema.Finite,
+  total: Schema.Finite,
 })
 
 /**
@@ -92,29 +92,20 @@ export type BootStatus = typeof BootStatus.Type
 
 export type LockStatus = 'has-lock' | 'no-lock'
 
-// TODO possibly allow a combination of these options
 // TODO allow a way to stream the migration progress back to the app
-export type MigrationOptions =
-  | {
-      strategy: 'auto'
-      hooks?: Partial<MigrationHooks>
-      logging?: {
-        excludeAffectedRows?: (sqlStmt: string) => boolean
-      }
-    }
-  | {
-      strategy: 'manual'
-      migrate: (
-        oldDb: Uint8Array<ArrayBuffer>,
-      ) => Uint8Array<ArrayBuffer> | Promise<Uint8Array<ArrayBuffer>> | Effect.Effect<Uint8Array<ArrayBuffer>, unknown>
-    }
+export type MigrationOptions = {
+  hooks?: Partial<MigrationHooks>
+  logging?: {
+    excludeAffectedRows?: (sqlStmt: string) => boolean
+  }
+}
 
 export type MigrationHooks = {
   /** Runs on the empty in-memory database with no database schemas applied yet */
   init: MigrationHook
-  /** Runs before applying the migration strategy but after table schemas have been applied and singleton rows have been created */
+  /** Runs after table schemas and singleton rows are created, but before rematerializing state from the eventlog */
   pre: MigrationHook
-  /** Runs after applying the migration strategy before creating export snapshot and closing the database */
+  /** Runs after rematerializing state from the eventlog */
   post: MigrationHook
 }
 

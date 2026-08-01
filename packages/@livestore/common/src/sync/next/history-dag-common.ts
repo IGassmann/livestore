@@ -60,10 +60,9 @@ export class HistoryDag {
   private readonly options: HistoryDagOptions
   private readonly idToIndex: Map<string, Graph.NodeIndex>
   private readonly indexToId: Map<Graph.NodeIndex, string>
+  private readonly incomingEdges: Map<Graph.NodeIndex, Set<Graph.EdgeIndex>>
+  private readonly outgoingEdges: Map<Graph.NodeIndex, Set<Graph.EdgeIndex>>
   private readonly graph: Graph.MutableDirectedGraph<HistoryDagNode, HistoryDagEdgeAttributes>
-  /** Mirrors Effect's encapsulated adjacency indexes so edge queries stay proportional to node degree. */
-  private readonly outgoingEdges = new Map<Graph.NodeIndex, Set<Graph.EdgeIndex>>()
-  private readonly incomingEdges = new Map<Graph.NodeIndex, Set<Graph.EdgeIndex>>()
 
   private constructor({
     graph,
@@ -80,6 +79,8 @@ export class HistoryDag {
     this.options = { ...defaultOptions, ...options }
     this.idToIndex = idToIndex !== undefined ? new Map(idToIndex) : new Map()
     this.indexToId = indexToId !== undefined ? new Map(indexToId) : new Map()
+    this.incomingEdges = new Map()
+    this.outgoingEdges = new Map()
   }
 
   static create(options?: Partial<HistoryDagOptions>): HistoryDag {
@@ -91,9 +92,7 @@ export class HistoryDag {
     const clone = HistoryDag.create(this.options)
 
     for (const [id, index] of this.idToIndex) {
-      const node =
-        Option.getOrUndefined(Graph.getNode(this.graph, index)) ??
-        shouldNeverHappen(`HistoryDag.copy missing node for ${id}`)
+      const node = this.nodeAt(index, `HistoryDag.copy missing node for ${id}`)
       clone.addNode(id, cloneHistoryDagNode(node))
     }
 
@@ -122,8 +121,8 @@ export class HistoryDag {
     const nodeIndex = Graph.addNode(this.graph, attributes)
     this.idToIndex.set(id, nodeIndex)
     this.indexToId.set(nodeIndex, id)
-    this.outgoingEdges.set(nodeIndex, new Set())
     this.incomingEdges.set(nodeIndex, new Set())
+    this.outgoingEdges.set(nodeIndex, new Set())
   }
 
   hasNode(id: string): boolean {
@@ -136,8 +135,7 @@ export class HistoryDag {
       return shouldNeverHappen(`HistoryDag node ${id} not found`)
     }
 
-    const node = Option.getOrUndefined(Graph.getNode(this.graph, index))
-    return node ?? shouldNeverHappen(`HistoryDag node data missing for ${id}`)
+    return this.nodeAt(index, `HistoryDag node data missing for ${id}`)
   }
 
   nodes(): IterableIterator<string> {
@@ -147,9 +145,7 @@ export class HistoryDag {
   nodeEntries(): IterableIterator<{ key: string; attributes: HistoryDagNode }> {
     return function* (this: HistoryDag) {
       for (const [id, index] of this.idToIndex) {
-        const attributes =
-          Option.getOrUndefined(Graph.getNode(this.graph, index)) ??
-          shouldNeverHappen(`HistoryDag node data missing for ${id}`)
+        const attributes = this.nodeAt(index, `HistoryDag node data missing for ${id}`)
         yield { key: id, attributes }
       }
     }.call(this)
@@ -168,10 +164,11 @@ export class HistoryDag {
     }
 
     const edgeIndex = Graph.addEdge(this.graph, sourceIndex, targetIndex, attributes)
-    const outgoingEdges =
-      this.outgoingEdges.get(sourceIndex) ?? shouldNeverHappen(`HistoryDag source ${sourceId} missing edge index`)
-    const incomingEdges =
-      this.incomingEdges.get(targetIndex) ?? shouldNeverHappen(`HistoryDag target ${targetId} missing edge index`)
+    const outgoingEdges = this.outgoingEdges.get(sourceIndex)
+    const incomingEdges = this.incomingEdges.get(targetIndex)
+    if (outgoingEdges === undefined || incomingEdges === undefined) {
+      return shouldNeverHappen(`HistoryDag edge index missing for ${sourceId} -> ${targetId}`)
+    }
     outgoingEdges.add(edgeIndex)
     incomingEdges.add(edgeIndex)
     return edgeIndex
@@ -185,7 +182,7 @@ export class HistoryDag {
       return []
     }
 
-    return [...(this.outgoingEdges.get(sourceIndex) ?? [])].filter((edgeIndex) => {
+    return Array.from(this.outgoingEdges.get(sourceIndex) ?? []).filter((edgeIndex) => {
       const edge = Option.getOrUndefined(Graph.getEdge(this.graph, edgeIndex))
       return edge?.target === targetIndex
     })
@@ -222,8 +219,7 @@ export class HistoryDag {
   }
 
   getEdgeAttributes(edgeIndex: Graph.EdgeIndex): HistoryDagEdgeAttributes {
-    const edge = Option.getOrUndefined(Graph.getEdge(this.graph, edgeIndex))
-    return edge?.data ?? shouldNeverHappen(`HistoryDag edge ${edgeIndex} not found`)
+    return this.edgeAt(edgeIndex, `HistoryDag edge ${edgeIndex} not found`).data
   }
 
   getEdgeAttribute<TKey extends keyof HistoryDagEdgeAttributes>(
@@ -252,19 +248,20 @@ export class HistoryDag {
       return
     }
 
-    const incidentEdges = new Set([...(this.outgoingEdges.get(index) ?? []), ...(this.incomingEdges.get(index) ?? [])])
-    for (const edgeIndex of incidentEdges) {
-      const edge = Option.getOrUndefined(Graph.getEdge(this.graph, edgeIndex))
-      if (edge === undefined) continue
-      this.outgoingEdges.get(edge.source)?.delete(edgeIndex)
-      this.incomingEdges.get(edge.target)?.delete(edgeIndex)
+    for (const edgeIndex of this.outgoingEdges.get(index) ?? []) {
+      const edge = this.edgeAt(edgeIndex, `HistoryDag edge ${edgeIndex} missing while dropping ${id}`)
+      removeEdgeIndex(this.incomingEdges, edge.target, edgeIndex)
+    }
+    for (const edgeIndex of this.incomingEdges.get(index) ?? []) {
+      const edge = this.edgeAt(edgeIndex, `HistoryDag edge ${edgeIndex} missing while dropping ${id}`)
+      removeEdgeIndex(this.outgoingEdges, edge.source, edgeIndex)
     }
 
     Graph.removeNode(this.graph, index)
     this.idToIndex.delete(id)
     this.indexToId.delete(index)
-    this.outgoingEdges.delete(index)
     this.incomingEdges.delete(index)
+    this.outgoingEdges.delete(index)
   }
 
   get size(): number {
@@ -290,6 +287,25 @@ export class HistoryDag {
       target,
       attributes: edge.data,
     }
+  }
+
+  private nodeAt(index: Graph.NodeIndex, message: string): HistoryDagNode {
+    return Option.getOrElse(Graph.getNode(this.graph, index), () => shouldNeverHappen(message))
+  }
+
+  private edgeAt(edgeIndex: Graph.EdgeIndex, message: string): Graph.Edge<HistoryDagEdgeAttributes> {
+    return Option.getOrElse(Graph.getEdge(this.graph, edgeIndex), () => shouldNeverHappen(message))
+  }
+}
+
+const removeEdgeIndex = (
+  edgeIndices: Map<Graph.NodeIndex, Set<Graph.EdgeIndex>>,
+  nodeIndex: Graph.NodeIndex,
+  edgeIndex: Graph.EdgeIndex,
+): void => {
+  const indices = edgeIndices.get(nodeIndex) ?? shouldNeverHappen(`HistoryDag edge index missing for node ${nodeIndex}`)
+  if (indices.delete(edgeIndex) === false) {
+    shouldNeverHappen(`HistoryDag edge ${edgeIndex} missing from node ${nodeIndex}`)
   }
 }
 
