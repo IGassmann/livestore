@@ -382,9 +382,6 @@ case "$task" in
     ensure_github_rulesets_dependencies
     mono github rulesets check "$@"
     ;;
-  update-deps)
-    mono update-deps "$@"
-    ;;
   *)
     echo "Unknown package task: $task" >&2
     exit 1

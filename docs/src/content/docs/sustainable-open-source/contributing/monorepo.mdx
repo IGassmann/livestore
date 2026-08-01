@@ -3,7 +3,7 @@ title: Monorepo
 description: Notes on the monorepo setup of LiveStore.
 ---
 
-import { REACT_VERSION, EFFECT_VERSION } from '../../../../../../packages/@local/shared/src/CONSTANTS'
+import { EFFECT_VERSION } from '../../../../../../packages/@local/shared/src/CONSTANTS'
 
 ## Prerequisites
 
@@ -137,7 +137,7 @@ export VITE_OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
 ### Package management
 
 - This project uses [pnpm](https://pnpm.io/) to manage the workspace.
-- We're using the `workspace:*` protocol to link packages together.
+- We're using the `workspace:` protocol (normally `workspace:^`) to link packages together.
 - We should try to keep dependencies to an absolute minimum and only add them if
   we absolutely need them.
 - We also need to manually add peer dependencies for each package.
@@ -145,7 +145,7 @@ export VITE_OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
   possible as duplicate dependencies can lead to a lot of issues and pain.
 - For updating dependencies across the monorepo, see
   [`contributor-docs/dependency-management.md`](https://github.com/livestorejs/livestore/blob/main/contributor-docs/dependency-management.md)
-  (catalog policy, peer-dep handling, validation).
+  (manual version alignment, peer-dependency handling, and validation).
 
 ### Notes on external dependencies
 
@@ -157,8 +157,8 @@ TypeScript, it should handle most use cases.
 
 The following packages need to be updated with extra care:
 
-- `react`/`react-dom` as we need to move in lockstep with Expo / React Native
-  (currently pinned to {REACT_VERSION})
+- `react`/`react-dom`, whose compatibility must be checked against the Expo and
+  React Native versions used by the documentation snippets
 - `effect` (currently pinned to {EFFECT_VERSION})
 
 #### Effect

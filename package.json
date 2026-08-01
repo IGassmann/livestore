@@ -104,7 +104,6 @@
     "ts:build-watch": "tsc --build tsconfig.dev.json --watch",
     "ts:clean": "tsc --build tsconfig.dev.json --clean",
     "ts:emit": "tsc --build tsconfig.dev.json --noCheck",
-    "update-deps": "bash scripts/bin/package-task update-deps",
     "changeset": "changeset",
     "changeset:status": "changeset status",
     "changeset:version": "changeset version"
