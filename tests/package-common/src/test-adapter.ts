@@ -4,6 +4,7 @@ import {
   type LockStatus,
   type MakeSqliteDb,
   makeClientSession,
+  MaterializationJournal,
   migrateDb,
   type SqliteDb,
   StateHead,
@@ -175,7 +176,7 @@ const makeLocalLeaderThread = ({
         shutdownChannel,
         syncPayloadEncoded,
         syncPayloadSchema,
-      }).pipe(Layer.provide(StateHead.layer({ dbState }))),
+      }).pipe(Layer.provide(Layer.mergeAll(StateHead.layer({ dbState }), MaterializationJournal.layer({ dbState })))),
     )
 
     return yield* Effect.gen(function* () {
