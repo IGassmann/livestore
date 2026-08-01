@@ -359,7 +359,7 @@ const filterGraphKeepAncestors = <N, E>(
 
   // Create a filtered copy of the graph
   return Graph.mutate(graph, (mutable) => {
-    for (const [nodeId] of mutable.nodes) {
+    for (const [nodeId] of Graph.nodes(mutable)) {
       if (shouldInclude.has(nodeId) === true) continue
       Graph.removeNode(mutable, nodeId)
     }
