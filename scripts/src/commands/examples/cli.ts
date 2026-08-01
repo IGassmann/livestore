@@ -73,8 +73,8 @@ const examplesRunCommand = Cli.Command.make(
   Effect.fn(function* ({ example }) {
     const availableExamples = yield* readExampleSlugs()
     const selected = yield* ensureExampleExists(example, availableExamples)
-    // Use the per-example working directory so dotenv / env loading behaves as if users ran pnpm dev manually.
-    yield* cmd(`pnpm dev`).pipe(Effect.provide(LivestoreWorkspace.toCwd(`examples/${selected}`)))
+    // Use the per-example working directory so dotenv / env loading matches a direct local task run.
+    yield* cmd(`vp run dev`).pipe(Effect.provide(LivestoreWorkspace.toCwd(`examples/${selected}`)))
   }),
 )
 

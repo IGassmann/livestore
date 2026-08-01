@@ -10,7 +10,7 @@
   "scripts": {
     "astro": "astro",
     "check": "astro sync && astro-check",
-    "build": "pnpm check && astro build",
+    "build": "vp run check && vp exec astro build",
     "dev": "astro dev",
     "dev:docs:sync": "mxbai store sync \"livestore-docs-dev\" \"./src/content/**/*.mdx\" \"./src/content/**/*.md\"  --yes --strategy fast",
     "lint:check:md-imports": "bash scripts/check-md-imports.sh",
@@ -90,6 +90,8 @@
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "deno": "2.9.2",
-    "vitest": "4.1.9"
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

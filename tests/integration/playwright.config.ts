@@ -88,7 +88,7 @@ const config: PlaywrightTestConfig = {
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: `./node_modules/.bin/vite --config src/tests/playwright/fixtures/vite.config.ts dev --port ${devServerPort}`,
+    command: `vp dev --config src/tests/playwright/fixtures/vite.config.ts --port ${devServerPort}`,
     port: devServerPort,
     reuseExistingServer: !process.env.CI,
   },

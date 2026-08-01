@@ -26,9 +26,9 @@ jobs:
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
       - name: Check first-party default refs
-        run: pnpm run source-policy
+        run: vp run source-policy
   lint:
     runs-on: ubuntu-24.04
     defaults:
@@ -36,9 +36,18 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
+        id: setup_vite_plus
+        with:
+          task-cache: 'true'
       - name: Run lint checks
-        run: pnpm run lint:full
+        run: vp run ci:lint
+      - name: Save Vite Task cache
+        if: ${{ success() }}
+        uses: actions/cache/save@v6
+        with:
+          path: node_modules/.vite/task-cache
+          key: ${{ steps.setup_vite_plus.outputs.task-cache-primary-key }}
   changeset-check:
     runs-on: ubuntu-24.04
     if: github.event_name == 'pull_request'
@@ -47,15 +56,15 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
       - name: Fetch changeset comparison base
         run: git fetch origin "${{ github.base_ref }}" --depth=1
       - name: Check release intent
-        run: pnpm run release:changeset:check-pr
+        run: vp run release:changeset:check-pr
         env:
           CHANGESET_BASE_REF: origin/${{ github.base_ref }}
       - name: Check changeset bodies
-        run: pnpm run release:changeset:check-bodies
+        run: vp run release:changeset:check-bodies
   ruleset-drift-check:
     runs-on: ubuntu-24.04
     if: (github.event_name == 'workflow_dispatch' && !startsWith(github.ref_name,
@@ -65,9 +74,9 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
       - name: Check repository ruleset drift
-        run: pnpm run github:rulesets:check
+        run: vp run github:rulesets:check
         env:
           GH_TOKEN: ${{ secrets.LIVESTORE_RULESET_ADMIN_TOKEN || github.token }}
   type-check:
@@ -77,9 +86,18 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
+        id: setup_vite_plus
+        with:
+          task-cache: 'true'
       - name: Run type-check
-        run: pnpm run ts:build
+        run: vp run ci:type-check
+      - name: Save Vite Task cache
+        if: ${{ success() }}
+        uses: actions/cache/save@v6
+        with:
+          path: node_modules/.vite/task-cache
+          key: ${{ steps.setup_vite_plus.outputs.task-cache-primary-key }}
   test-unit:
     runs-on: ubuntu-24.04
     defaults:
@@ -87,9 +105,9 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
       - name: Run unit tests
-        run: pnpm run test:unit
+        run: vp run ci:test-unit
   test-integration-sync-provider:
     strategy:
       matrix:
@@ -107,7 +125,7 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
       - name: Set OTEL_EXPORTER_OTLP_HEADERS environment variable
         env:
           GRAFANA_CLOUD_OTLP_INSTANCE_ID: '1227256'
@@ -119,7 +137,7 @@ jobs:
           # Disable in Vite (otherwise CORS issues)
           echo "VITE_OTEL_EXPORTER_OTLP_ENDPOINT=" >> $GITHUB_ENV
       - name: Run sync-provider tests for ${{ matrix.provider }}
-        run: pnpm --dir tests/sync-provider run test:${{ matrix.provider }}
+        run: vp run --filter ./tests/sync-provider test:${{ matrix.provider }}
         env:
           OTEL_STATE_DIR: ''
   test-integration-playwright:
@@ -135,7 +153,7 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
         with:
           playwright: 'true'
       - name: Set OTEL_EXPORTER_OTLP_HEADERS environment variable
@@ -151,7 +169,7 @@ jobs:
       - name: Run integration tests
         id: integration_tests
         continue-on-error: ${{ matrix.suite == 'devtools' }}
-        run: pnpm run test:integration:playwright --project=${{ matrix.suite }}
+        run: vp run test:integration:playwright --project=${{ matrix.suite }}
       - name: Report tolerated devtools failure
         if: ${{ matrix.suite == 'devtools' && steps.integration_tests.outcome == 'failure' }}
         run: echo "::warning::Devtools Playwright suite failed but is currently allowed to fail while it is stabilized."
@@ -165,7 +183,7 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-        run: pnpm run test:integration:playwright:upload-trace ${{ matrix.suite }}
+        run: vp run test:integration:playwright:upload-trace ${{ matrix.suite }}
   perf-test:
     runs-on: ubuntu-24.04
     defaults:
@@ -176,7 +194,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
         with:
           playwright: 'true'
       - name: Set OTEL_EXPORTER_OTLP_HEADERS environment variable
@@ -190,7 +208,7 @@ jobs:
           # Disable in Vite (otherwise CORS issues)
           echo "VITE_OTEL_EXPORTER_OTLP_ENDPOINT=" >> $GITHUB_ENV
       - name: Run performance tests
-        run: pnpm run test:perf
+        run: vp run test:perf
         env:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           GRAFANA_ENDPOINT: https://livestore.grafana.net
@@ -210,7 +228,7 @@ jobs:
             accept-flake-config = true
             access-tokens = github.com=${{ github.token }}
           summarize: true
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
         with:
           playwright: 'true'
       - name: Set OTEL_EXPORTER_OTLP_HEADERS environment variable
@@ -224,9 +242,9 @@ jobs:
           # Disable in Vite (otherwise CORS issues)
           echo "VITE_OTEL_EXPORTER_OTLP_ENDPOINT=" >> $GITHUB_ENV
       - name: Build wa-sqlite
-        run: pnpm run test:integration:wa-sqlite:build
+        run: vp run test:integration:wa-sqlite:build
       - name: Run wa-sqlite tests
-        run: pnpm run test:integration:wa-sqlite
+        run: vp run test:integration:wa-sqlite
         env:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           GRAFANA_ENDPOINT: https://livestore.grafana.net
@@ -238,21 +256,21 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
         with:
           playwright: 'true'
       - name: Install examples dependencies
-        run: pnpm run examples:install
+        run: vp run examples:install
       - name: Build examples
-        run: pnpm run examples:build:src
+        run: vp run examples:build:src
       - name: Test examples
-        run: pnpm run examples:test
+        run: vp run examples:test
       - id: deploy-examples
         name: Deploy examples to Cloudflare
         if: ${{ success() && github.repository == 'livestorejs/livestore' &&
           (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.fork != true) }}
-        run: pnpm run examples:deploy
+        run: vp run examples:deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -268,26 +286,42 @@ jobs:
           retention-days: 14
       - name: Validate hosted example links
         if: ${{ success() && steps.deploy-examples.outcome == 'success' }}
-        run: pnpm run examples:validate-links
+        run: vp run examples:validate-links
   build-deploy-docs:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
+        id: setup_vite_plus
         with:
           playwright: 'true'
-      - name: Build docs snippets
-        run: pnpm run docs:build:phase:snippets
-      - name: Build docs diagrams
-        run: pnpm run docs:build:phase:diagrams
-      - name: Build Astro docs bundle
-        run: pnpm run docs:build:phase:astro
+          task-cache: 'true'
+      - name: Build docs with Vite Task
+        run: |
+          env -i \
+            PATH="$PATH" \
+            HOME="$HOME" \
+            USER="$USER" \
+            SHELL="$SHELL" \
+            LANG="$LANG" \
+            CI="$CI" \
+            GITHUB_ACTIONS="$GITHUB_ACTIONS" \
+            GITHUB_BRANCH_NAME="$GITHUB_BRANCH_NAME" \
+            vp run ci:docs:astro
+      - name: Save Vite Task cache
+        if: ${{ success() }}
+        uses: actions/cache/save@v6
+        with:
+          path: node_modules/.vite/task-cache
+          key: ${{ steps.setup_vite_plus.outputs.task-cache-primary-key }}
       - name: Collect docs build diagnostics on failure
         if: ${{ failure() }}
-        run: pnpm run docs:build:diagnostics
+        run: vp run docs:build:diagnostics
       - name: Upload docs build logs
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -300,7 +334,7 @@ jobs:
         if: ${{ success() && github.repository == 'livestorejs/livestore' &&
           (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.fork != true) }}
-        run: pnpm run docs:deploy
+        run: vp run docs:deploy
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           WORKFLOW_REPORT_OUTPUT_FILE: ${{ runner.temp }}/workflow-reports/docs-deploy.jsonl

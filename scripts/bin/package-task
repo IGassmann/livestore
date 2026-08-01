@@ -51,6 +51,20 @@ if [[ -z "${PUPPETEER_EXECUTABLE_PATH:-}" ]]; then
 fi
 export PUPPETEER_SKIP_DOWNLOAD="${PUPPETEER_SKIP_DOWNLOAD:-1}"
 
+# GNU timeout is available on CI runners but not on macOS by default. Preserve
+# CI's process guard while keeping the same package tasks runnable locally.
+run_with_timeout() {
+  local kill_after="$1"
+  local duration="$2"
+  shift 2
+
+  if command -v timeout >/dev/null 2>&1; then
+    command timeout --signal=TERM --kill-after="$kill_after" "$duration" "$@"
+  else
+    "$@"
+  fi
+}
+
 ensure_github_rulesets_dependencies() {
   if [[ -d "$workspace_root/scripts/node_modules/@livestore/utils-dev" ]]; then
     return 0
@@ -66,12 +80,13 @@ ensure_github_rulesets_dependencies() {
   fi
 
   echo "[package-task] Installing workspace dependencies required by github:rulesets:check..."
-  pnpm install \
+  vp install \
     --frozen-lockfile \
     --ignore-scripts \
     --config.confirmModulesPurge=false \
     --config.side-effects-cache=false \
     --config.package-import-method=clone-or-copy \
+    -- \
     --pm-on-fail=ignore \
     "${store_args[@]}"
 }
@@ -252,7 +267,7 @@ case "$task" in
     : "${MXBAI_API_KEY:?Missing MXBAI_API_KEY secret}"
     : "${MXBAI_VECTOR_STORE_ID:?Missing MXBAI_VECTOR_STORE_ID secret}"
     timeout --signal=TERM --kill-after=1m 10m \
-      pnpm --dir docs exec mxbai store sync "$MXBAI_VECTOR_STORE_ID" \
+      vp exec --filter ./docs mxbai store sync "$MXBAI_VECTOR_STORE_ID" \
         "./src/content/**/*.mdx" \
         "./src/content/**/*.md" \
         --yes --strategy fast "$@"
@@ -269,11 +284,11 @@ case "$task" in
     ;;
   docs:build:phase:snippets)
     mkdir -p tmp/ci-docs
-    timeout --signal=TERM --kill-after=2m 20m mono docs snippets build "$@" 2>&1 | tee tmp/ci-docs/01-snippets.log
+    run_with_timeout 2m 20m mono docs snippets build "$@" 2>&1 | tee tmp/ci-docs/01-snippets.log
     ;;
   docs:build:phase:diagrams)
     mkdir -p tmp/ci-docs
-    timeout --signal=TERM --kill-after=2m 20m mono docs diagrams build "$@" 2>&1 | tee tmp/ci-docs/02-diagrams.log
+    run_with_timeout 2m 20m mono docs diagrams build "$@" 2>&1 | tee tmp/ci-docs/02-diagrams.log
     ;;
   docs:build:phase:astro)
     mkdir -p tmp/ci-docs
@@ -289,7 +304,7 @@ case "$task" in
       kill "$HEARTBEAT_PID" 2>/dev/null || true
     }
     trap cleanup EXIT
-    timeout --signal=TERM --kill-after=2m 20m mono docs build --api-docs --skip-deps "$@" 2>&1 | tee tmp/ci-docs/03-astro-build.log
+    run_with_timeout 2m 20m mono docs build --api-docs --skip-deps "$@" 2>&1 | tee tmp/ci-docs/03-astro-build.log
     ;;
   docs:build:diagnostics)
     mkdir -p tmp/ci-docs
@@ -311,11 +326,11 @@ case "$task" in
     ;;
   examples:install)
     export npm_config_manage_package_manager_versions=false
-    pnpm install --frozen-lockfile --dir examples "$@"
+    (cd examples && vp install --frozen-lockfile "$@")
     ;;
   examples:build:src)
     export npm_config_manage_package_manager_versions=false
-    pnpm --dir examples --filter 'livestore-example-*' --workspace-concurrency=1 build "$@"
+    vp run --filter 'livestore-example-*' --concurrency-limit 1 build "$@"
     ;;
   release:snapshot)
     mono release snapshot "$@"
@@ -361,14 +376,14 @@ case "$task" in
     node scripts/src/commands/changesets.ts check-bodies "$@"
     ;;
   release:changeset:status)
-    pnpm exec changeset status --since "${CHANGESET_BASE_REF:-origin/main}" "$@"
+    vp exec changeset status --since "${CHANGESET_BASE_REF:-origin/main}" "$@"
     ;;
   release:changeset:version)
-    pnpm exec changeset version "$@"
+    vp exec changeset version "$@"
     node scripts/src/commands/changesets.ts restore-prerelease-changesets
     node scripts/src/commands/changesets.ts sync-version-source
     node scripts/src/commands/changesets.ts sync-standalone-consumers
-    pnpm install --lockfile-only --no-frozen-lockfile
+    vp install --lockfile-only --no-frozen-lockfile
     node scripts/src/commands/changesets.ts assert-fixed-versions
     node scripts/src/commands/changesets.ts write-release-plan --npm-tag "${LIVESTORE_NPM_TAG:-latest}"
     ;;

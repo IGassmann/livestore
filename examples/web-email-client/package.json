@@ -25,14 +25,15 @@
     "@vitejs/plugin-react": "5.1.2",
     "tailwindcss": "4.1.18",
     "typescript": "6.0.3",
-    "vite": "7.3.1",
-    "wrangler": "4.42.2"
+    "vite": "catalog:",
+    "wrangler": "4.42.2",
+    "vite-plus": "catalog:"
   },
   "scripts": {
-    "build": "vite build",
-    "deploy": "pnpm build && wrangler deploy",
-    "dev": "vite",
-    "preview": "vite preview"
+    "build": "vp build",
+    "deploy": "vp run build && vp exec wrangler deploy",
+    "dev": "vp dev",
+    "preview": "vp preview"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

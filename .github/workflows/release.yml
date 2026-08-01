@@ -60,9 +60,9 @@ jobs:
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
       - name: Check first-party default refs
-        run: pnpm run source-policy
+        run: vp run source-policy
   create-release-pr:
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'create-release-pr'
     runs-on: ubuntu-latest
@@ -79,13 +79,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
       - name: Generate release plan from Changesets
-        run: pnpm run release:changeset:version
+        run: vp run release:changeset:version
         env:
           LIVESTORE_NPM_TAG: ${{ inputs.npm_tag }}
       - name: Extract release notes
-        run: pnpm run release:notes:extract
+        run: vp run release:notes:extract
       - name: Open release plan PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -193,7 +193,7 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
         with:
           playwright: 'true'
       - name: Select release plan for validation
@@ -241,7 +241,7 @@ jobs:
               npmTag: $npmTag
             }' > release/release-plan.json
       - name: Dry-run stable package publish
-        run: pnpm run release:stable:dryrun
+        run: vp run release:stable:dryrun
       - name: Read release plan
         run: |
           set -euo pipefail
@@ -257,7 +257,7 @@ jobs:
             echo "LIVESTORE_RELEASE_DEPLOY_TARGET=dev" >> "$GITHUB_ENV"
           fi
       - name: Certify DevTools artifact liveness
-        run: pnpm run release:devtools-artifact:certify-liveness:no-install
+        run: vp run release:devtools-artifact:certify-liveness:no-install
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -268,7 +268,7 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
       - name: Dry-run DevTools artifact repack
-        run: pnpm run release:devtools-artifact:repack-dryrun:no-install
+        run: vp run release:devtools-artifact:repack-dryrun:no-install
   publish-release:
     if: github.repository == 'livestorejs/livestore' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.mode == 'publish-release'))
     runs-on: ubuntu-24.04
@@ -282,7 +282,7 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
         with:
           playwright: 'true'
       - name: Read release plan
@@ -330,9 +330,9 @@ jobs:
           # Disable in Vite (otherwise CORS issues)
           echo "VITE_OTEL_EXPORTER_OTLP_ENDPOINT=" >> $GITHUB_ENV
       - name: Publish stable package release
-        run: pnpm run release:stable:publish
+        run: vp run release:stable:publish
       - name: Certify DevTools artifact liveness
-        run: pnpm run release:devtools-artifact:certify-liveness:no-install
+        run: vp run release:devtools-artifact:certify-liveness:no-install
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -343,28 +343,28 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
       - name: Publish DevTools artifact release
-        run: pnpm run release:devtools-artifact:publish:no-install
+        run: vp run release:devtools-artifact:publish:no-install
       - name: Deploy production docs — build + deploy
         if: env.LIVESTORE_RELEASE_DEPLOY_TARGET == 'prod'
         timeout-minutes: 30
-        run: pnpm run docs:deploy:prod:phase:build-deploy
+        run: vp run docs:deploy:prod:phase:build-deploy
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       - name: Deploy production docs — verify
         if: env.LIVESTORE_RELEASE_DEPLOY_TARGET == 'prod'
         timeout-minutes: 15
-        run: pnpm run docs:deploy:prod:phase:verify
+        run: vp run docs:deploy:prod:phase:verify
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       - name: Deploy production docs — purge CDN
         if: env.LIVESTORE_RELEASE_DEPLOY_TARGET == 'prod'
         timeout-minutes: 15
-        run: pnpm run docs:deploy:prod:phase:purge
+        run: vp run docs:deploy:prod:phase:purge
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       - name: Collect docs deploy diagnostics on failure
         if: ${{ failure() && env.LIVESTORE_RELEASE_DEPLOY_TARGET == 'prod' }}
-        run: pnpm run docs:deploy:prod:diagnostics
+        run: vp run docs:deploy:prod:diagnostics
       - name: Upload docs prod deploy logs
         if: ${{ always() && env.LIVESTORE_RELEASE_DEPLOY_TARGET == 'prod' }}
         uses: actions/upload-artifact@v4
@@ -376,14 +376,14 @@ jobs:
       - name: Deploy production examples
         if: env.LIVESTORE_RELEASE_DEPLOY_TARGET == 'prod'
         timeout-minutes: 30
-        run: pnpm run examples:deploy:prod
+        run: vp run examples:deploy:prod
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Sync production docs search
         if: env.LIVESTORE_RELEASE_DEPLOY_TARGET == 'prod'
         timeout-minutes: 15
-        run: pnpm run docs:search:sync:prod
+        run: vp run docs:search:sync:prod
         env:
           MXBAI_API_KEY: ${{ secrets.MXBAI_API_KEY }}
           MXBAI_VECTOR_STORE_ID: ${{ secrets.MXBAI_VECTOR_STORE_ID }}
@@ -403,7 +403,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
         with:
           playwright: 'true'
       - name: Assert tokenless npm trusted publishing
@@ -415,11 +415,11 @@ jobs:
             exit 1
           fi
       - name: Publish snapshot version
-        run: pnpm run release:snapshot:git-sha
+        run: vp run release:snapshot:git-sha
         env:
           GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Publish DevTools artifact snapshot
-        run: pnpm run release:devtools-artifact:publish
+        run: vp run release:devtools-artifact:publish
         env:
           LIVESTORE_DEVTOOLS_OUT_DIR: ${{ runner.temp }}/livestore-devtools-snapshot
           LIVESTORE_RELEASE_VERSION: 0.0.0-snapshot-${{ github.event.workflow_run.head_sha || github.sha }}

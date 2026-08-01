@@ -20,7 +20,7 @@ const config: PlaywrightTestConfig = {
   webServer: baseURL
     ? undefined
     : {
-        command: 'pnpm vite --force --host 127.0.0.1',
+        command: 'vp dev --force --host 127.0.0.1',
         port,
         reuseExistingServer: true,
         timeout: 180_000,
