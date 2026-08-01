@@ -20,6 +20,11 @@ out because the suite includes randomized property checks and Docker-backed
 tests. Keep networked, credentialed, deployment, and other nondeterministic work
 outside cached tasks unless it can be made hermetic first.
 
+The docs job also transports three cacheable build tasks: snippets, diagrams,
+and the Astro bundle. The Astro task depends on the two generated-content tasks,
+so their cached output directories are restored before Astro's fingerprint is
+checked. Deployment and failure diagnostics remain uncached.
+
 Docs deployment uses `mono docs deploy`. Normal `main` pushes update the dev
 Netlify site, pull requests publish sticky and commit-specific aliases on the
 dev site, and stable release publishing is the only workflow path that updates

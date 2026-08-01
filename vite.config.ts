@@ -1,5 +1,28 @@
 import { defineConfig } from 'vite-plus'
 
+const docsTaskInputs = [
+  'package.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'vite.config.ts',
+  'CHANGELOG.md',
+  'scripts/**',
+  '!scripts/**/dist/**',
+  '!scripts/**/node_modules/**',
+  'docs/**',
+  '!docs/.astro/**',
+  '!docs/.netlify/**',
+  '!docs/dist/**',
+  '!docs/node_modules/**',
+  '!docs/src/content/docs/api/**',
+  'examples/**',
+  '!examples/**/dist/**',
+  '!examples/**/node_modules/**',
+  'packages/**',
+  '!packages/**/dist/**',
+  '!packages/**/node_modules/**',
+]
+
 export default defineConfig({
   run: {
     cache: {
@@ -29,6 +52,39 @@ export default defineConfig({
         // This suite includes randomized property tests and Docker-backed checks,
         // so replaying a previous pass would hide nondeterministic failures.
         cache: false,
+      },
+      'ci:docs:snippets': {
+        command: 'bash scripts/bin/package-task docs:build:phase:snippets',
+        input: docsTaskInputs,
+        output: ['docs/node_modules/.astro-twoslash-code/**', 'tmp/ci-docs/01-snippets.log'],
+      },
+      'ci:docs:diagrams': {
+        command: 'bash scripts/bin/package-task docs:build:phase:diagrams',
+        input: [
+          'package.json',
+          'pnpm-lock.yaml',
+          'pnpm-workspace.yaml',
+          'vite.config.ts',
+          'scripts/bin/package-task',
+          'scripts/src/**',
+          'docs/package.json',
+          'docs/src/content/_assets/diagrams/**',
+          'packages/@local/astro-tldraw/**',
+          'packages/@livestore/utils/**',
+          'packages/@livestore/utils-dev/**',
+        ],
+        output: ['docs/node_modules/.astro-tldraw/**', 'tmp/ci-docs/02-diagrams.log'],
+      },
+      'ci:docs:astro': {
+        // Deployment is a separate uncached step. Remove its per-job OIDC
+        // credentials from the build process so they cannot affect or enter the
+        // cached result.
+        command:
+          'env -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL bash scripts/bin/package-task docs:build:phase:astro',
+        dependsOn: ['ci:docs:snippets', 'ci:docs:diagrams'],
+        env: ['GITHUB_ACTIONS', 'GITHUB_BRANCH_NAME'],
+        input: [...docsTaskInputs, 'docs/node_modules/.astro-twoslash-code/**', 'docs/node_modules/.astro-tldraw/**'],
+        output: ['docs/dist/**', 'docs/.astro/**', 'docs/src/content/docs/api/**', 'tmp/ci-docs/03-*.log'],
       },
     },
   },
