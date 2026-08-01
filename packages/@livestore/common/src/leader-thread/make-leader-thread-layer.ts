@@ -176,7 +176,7 @@ export const makeLeaderThreadLayer = ({
     const syncProcessor = yield* LeaderSyncProcessor.make({
       schema,
       dbState,
-      initialSyncState: getInitialSyncState({ dbEventlog, dbState, dbEventlogMissing }),
+      initialSyncState: getInitialSyncState({ dbEventlog, dbEventlogMissing }),
       initialBlockingSyncContext,
       onError: syncOptions?.onSyncError ?? 'ignore',
       onBackendIdMismatch: syncOptions?.onBackendIdMismatch ?? 'reset',
@@ -261,11 +261,9 @@ const hasStateTables = (db: SqliteDb) => {
 
 const getInitialSyncState = ({
   dbEventlog,
-  dbState,
   dbEventlogMissing,
 }: {
   dbEventlog: SqliteDb
-  dbState: SqliteDb
   dbEventlogMissing: boolean
 }) => {
   const initialBackendHead =
@@ -292,7 +290,6 @@ const getInitialSyncState = ({
         ? []
         : Eventlog.getEventsSince({
             dbEventlog,
-            dbState,
             since: {
               global: initialBackendHead,
               client: EventSequenceNumber.Client.DEFAULT,
