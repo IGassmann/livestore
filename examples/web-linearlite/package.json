@@ -66,7 +66,7 @@
   },
   "scripts": {
     "build": "vp build",
-    "deploy": "pnpm run build && pnpm exec wrangler deploy",
+    "deploy": "vp run build && vp exec wrangler deploy",
     "dev": "vp dev --force",
     "preview": "vp preview",
     "test": "playwright test",

@@ -7,7 +7,7 @@
     "test": "playwright test",
     "test-app": "vp build test-app && vp preview test-app",
     "test-app:dev": "vp test-app",
-    "test:profiler": "PERF_PROFILER=1 pnpm test"
+    "test:profiler": "PERF_PROFILER=1 vp run test"
   },
   "dependencies": {
     "@livestore/adapter-web": "workspace:^",

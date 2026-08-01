@@ -8,7 +8,7 @@
     "test:devtools": "playwright test --project=devtools",
     "test:misc": "playwright test --project=misc",
     "test:todomvc": "playwright test --project=todomvc",
-    "upload-trace": "sh -c 'project=\"${1:?Pass project name}\"; if [ -n \"${NETLIFY_AUTH_TOKEN:-}\" ]; then pnpm dlx netlify-cli deploy --no-build --dir=playwright-report --site livestore-ci --filter @local/tests-integration --alias \"$project-$(git -C ../.. rev-parse --short HEAD)\"; else echo \"Skipping Netlify deploy: NETLIFY_AUTH_TOKEN not set\"; fi' --"
+    "upload-trace": "sh -c 'project=\"${1:?Pass project name}\"; if [ -n \"${NETLIFY_AUTH_TOKEN:-}\" ]; then vp dlx netlify-cli deploy --no-build --dir=playwright-report --site livestore-ci --filter @local/tests-integration --alias \"$project-$(git -C ../.. rev-parse --short HEAD)\"; else echo \"Skipping Netlify deploy: NETLIFY_AUTH_TOKEN not set\"; fi' --"
   },
   "dependencies": {
     "@livestore/adapter-cloudflare": "workspace:^",

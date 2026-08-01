@@ -30,9 +30,9 @@ jobs:
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
       - name: Check first-party default refs
-        run: pnpm run source-policy
+        run: vp run source-policy
   deploy-docs:
     if: ${{ inputs.target == 'docs' || inputs.target == 'all' }}
     runs-on: ubuntu-24.04
@@ -42,7 +42,7 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
         with:
           playwright: 'true'
       - name: Set OTEL_EXPORTER_OTLP_HEADERS environment variable
@@ -56,20 +56,20 @@ jobs:
           # Disable in Vite (otherwise CORS issues)
           echo "VITE_OTEL_EXPORTER_OTLP_ENDPOINT=" >> $GITHUB_ENV
       - name: Build + deploy docs to Netlify
-        run: pnpm run docs:deploy:prod:phase:build-deploy
+        run: vp run docs:deploy:prod:phase:build-deploy
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       - name: Verify docs deploy
-        run: pnpm run docs:deploy:prod:phase:verify
+        run: vp run docs:deploy:prod:phase:verify
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       - name: Purge Netlify CDN
-        run: pnpm run docs:deploy:prod:phase:purge
+        run: vp run docs:deploy:prod:phase:purge
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       - name: Collect docs deploy diagnostics on failure
         if: ${{ failure() }}
-        run: pnpm run docs:deploy:prod:diagnostics
+        run: vp run docs:deploy:prod:diagnostics
       - name: Upload docs prod deploy logs
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -87,7 +87,7 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
         with:
           playwright: 'true'
       - name: Set OTEL_EXPORTER_OTLP_HEADERS environment variable
@@ -101,7 +101,7 @@ jobs:
           # Disable in Vite (otherwise CORS issues)
           echo "VITE_OTEL_EXPORTER_OTLP_ENDPOINT=" >> $GITHUB_ENV
       - name: Deploy production examples
-        run: pnpm run examples:deploy:prod
+        run: vp run examples:deploy:prod
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -114,11 +114,11 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-vite-plus
         with:
           playwright: 'true'
       - name: Sync production docs search
-        run: pnpm run docs:search:sync:prod
+        run: vp run docs:search:sync:prod
         env:
           MXBAI_API_KEY: ${{ secrets.MXBAI_API_KEY }}
           MXBAI_VECTOR_STORE_ID: ${{ secrets.MXBAI_VECTOR_STORE_ID }}

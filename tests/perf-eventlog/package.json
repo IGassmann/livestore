@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm exec vite build --config test-app/vite.config.ts",
-    "dev": "pnpm exec vite --config test-app/vite.config.ts",
-    "preview": "pnpm exec vite preview --config test-app/vite.config.ts",
+    "build": "vp build --config test-app/vite.config.ts",
+    "dev": "vp dev --config test-app/vite.config.ts",
+    "preview": "vp preview --config test-app/vite.config.ts",
     "test": "playwright test"
   },
   "dependencies": {

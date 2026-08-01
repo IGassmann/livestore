@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "vp test",
-    "build": "pnpm --filter @livestore/wa-sqlite run build"
+    "build": "vp run --filter @livestore/wa-sqlite build"
   },
   "devDependencies": {
     "@livestore/wa-sqlite": "workspace:^",
