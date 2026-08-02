@@ -107,17 +107,7 @@ supportedArchitectures:
 
 enableGlobalVirtualStore: true
 
-packageImportMethod: clone-or-copy
-
-optimisticRepeatInstall: false
-
-verifyDepsBeforeRun: false
-
 linkWorkspacePackages: true
-
-sideEffectsCache: false
-
-pmOnFail: ignore
 
 minimumReleaseAgeExclude:
   - '@deno/darwin-arm64@2.9.2'
