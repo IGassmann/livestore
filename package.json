@@ -56,7 +56,7 @@
     "github:rulesets:check": "bash scripts/bin/package-task github:rulesets:check",
     "lint:check": "pnpm run lint:check:format && pnpm run lint:check:oxlint && pnpm run lint:check:lockfile",
     "lint:check:format": "oxfmt --check packages tests scripts docs .github",
-    "lint:check:lockfile": "pnpm install --frozen-lockfile --ignore-scripts --config.confirmModulesPurge=false --config.side-effects-cache=false --config.verify-store-integrity=true --config.strict-store-pkg-content-check=true --config.package-import-method=clone-or-copy --pm-on-fail=ignore",
+    "lint:check:lockfile": "pnpm install --lockfile-only --frozen-lockfile",
     "lint:check:madge": "madge --circular --no-spinner examples/*/src packages/*/*/src",
     "lint:check:oxlint": "oxlint --import-plugin --deny-warnings --type-aware --tsconfig tsconfig.dev.json packages tests scripts docs .github",
     "lint:fix": "pnpm run lint:fix:format && pnpm run lint:fix:oxlint",

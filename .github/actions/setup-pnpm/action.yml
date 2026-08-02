@@ -24,7 +24,7 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: pnpm install --frozen-lockfile --config.confirmModulesPurge=false
+      run: pnpm install
 
     - name: Install Playwright Chromium
       if: ${{ inputs.playwright == 'true' }}
