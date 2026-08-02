@@ -214,11 +214,9 @@ case "$task" in
     pgrep -af 'astro|chromium|chrome_crashpad_handler|node|mono' > tmp/ci-docs/pgrep-build-procs.log || true
     ;;
   examples:install)
-    export npm_config_manage_package_manager_versions=false
     pnpm install --frozen-lockfile --dir examples "$@"
     ;;
   examples:build:src)
-    export npm_config_manage_package_manager_versions=false
     pnpm --dir examples --filter 'livestore-example-*' --workspace-concurrency=1 build "$@"
     ;;
   release:snapshot:git-sha)
