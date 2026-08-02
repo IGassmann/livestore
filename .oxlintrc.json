@@ -1,6 +1,6 @@
 {
-  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
-  "plugins": ["import", "typescript", "unicorn", "oxc", "react", "react", "react-perf"],
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["import", "typescript", "unicorn", "oxc", "react", "react-perf"],
   "jsPlugins": ["./scripts/oxlint-plugin/overeng/mod.ts"],
   "ignorePatterns": [
     "**/node_modules/**",
@@ -31,10 +31,7 @@
   "categories": {
     "correctness": "error",
     "suspicious": "warn",
-    "pedantic": "off",
-    "perf": "warn",
-    "style": "off",
-    "restriction": "off"
+    "perf": "warn"
   },
   "rules": {
     "import/no-commonjs": "error",
@@ -46,18 +43,10 @@
     "react/self-closing-comp": "error",
     "typescript/prefer-namespace-keyword": "error",
     "typescript/no-inferrable-types": "error",
-    "unicorn/no-array-callback-reference": "off",
-    "typescript/no-explicit-any": "off",
-    "typescript/no-deprecated": "off",
-    "typescript/consistent-type-definitions": "off",
     "no-unused-vars": "off",
-    "eqeqeq": "off",
     "react/react-in-jsx-scope": "off",
     "func-style": "error",
-    "oxc/no-barrel-file": "off",
     "import/default": "off",
-    "import/no-cycle": "off",
-    "import/no-dynamic-require": "off",
     "import/no-unassigned-import": "off",
     "import/namespace": "off",
     "import/no-named-as-default": "off",
@@ -75,14 +64,9 @@
     "typescript/no-unsafe-type-assertion": "off",
     "typescript/no-unnecessary-boolean-literal-compare": "off",
     "typescript/no-unnecessary-type-arguments": "off",
-    "typescript/no-duplicate-type-constituents": "error",
     "typescript/no-unnecessary-type-assertion": "error",
-    "typescript/restrict-template-expressions": "error",
     "typescript/no-floating-promises": "off",
-    "typescript/no-base-to-string": "error",
-    "typescript/no-redundant-type-constituents": "error",
     "typescript/no-unnecessary-template-expression": "error",
-    "typescript/no-meaningless-void-operator": "error",
     "typescript/unbound-method": "off",
     "typescript/no-misused-spread": "off",
     "typescript/no-for-in-array": "off",
@@ -129,9 +113,7 @@
     {
       "files": ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**", "**/tests/**"],
       "rules": {
-        "unicorn/no-array-sort": "off",
-        "unicorn/consistent-function-scoping": "off",
-        "require-yield": "off"
+        "unicorn/no-array-sort": "off"
       }
     },
     {
@@ -144,12 +126,7 @@
       "files": ["**/*.gen.*", "**/.astro/**", "**/routeTree.gen.ts"],
       "rules": {
         "func-style": "off",
-        "import/no-commonjs": "off",
-        "import/no-named-as-default": "off",
-        "import/no-unassigned-import": "off",
-        "oxc/no-barrel-file": "off",
-        "oxc/no-map-spread": "off",
-        "unicorn/consistent-function-scoping": "off"
+        "import/no-commonjs": "off"
       }
     },
     {
@@ -158,17 +135,9 @@
         "func-style": "off",
         "import/no-commonjs": "off",
         "typescript/await-thenable": "off",
-        "unicorn/no-new-array": "off",
         "unicorn/no-array-sort": "off",
-        "unicorn/consistent-function-scoping": "off",
         "overeng/explicit-boolean-compare": "off",
         "no-param-reassign": "off"
-      }
-    },
-    {
-      "files": ["**/*.svelte"],
-      "rules": {
-        "import/no-unassigned-import": "off"
       }
     }
   ]

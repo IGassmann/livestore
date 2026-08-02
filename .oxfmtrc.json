@@ -1,17 +1,12 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicksrandall/oxfmt/refs/heads/main/configuration_schema.json",
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "semi": false,
   "singleQuote": true,
   "printWidth": 120,
-  "tabWidth": 2,
-  "useTabs": false,
-  "trailingComma": "all",
-  "experimentalSortImports": {
+  "sortImports": {
     "groups": ["builtin", "external", "internal", ["parent", "sibling", "index"]],
-    "internalPattern": ["@livestore/", "@local/"],
-    "newlinesBetween": true
+    "internalPattern": ["@livestore/", "@local/"]
   },
-  "experimentalSortPackageJson": true,
   "ignorePatterns": [
     "**/node_modules/**",
     "**/.pnpm/**",
@@ -27,9 +22,6 @@
     "**/package.json",
     "**/tsconfig.json",
     "**/tsconfig.*.json",
-    "**/node_modules/**",
-    "**/.pnpm/**",
-    "**/.pnpm-store/**",
     "tests/integration/node_modules/**",
     "**/*.mdx",
     "docs/.astro/**",
