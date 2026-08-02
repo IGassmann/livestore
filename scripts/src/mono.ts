@@ -5,7 +5,6 @@ import { Cli, PlatformNode } from '@livestore/utils/node'
 import { debugCommand } from './commands/debug.ts'
 import { docsCommand } from './commands/docs.ts'
 import { examplesCommand } from './commands/examples/cli.ts'
-import { githubCommand } from './commands/github.ts'
 import { releaseCommand } from './commands/release.ts'
 
 const circularCommand = Cli.Command.make(
@@ -19,14 +18,7 @@ const circularCommand = Cli.Command.make(
 )
 
 const command = Cli.Command.make('mono').pipe(
-  Cli.Command.withSubcommands([
-    examplesCommand,
-    githubCommand,
-    circularCommand,
-    docsCommand,
-    releaseCommand,
-    debugCommand,
-  ]),
+  Cli.Command.withSubcommands([examplesCommand, circularCommand, docsCommand, releaseCommand, debugCommand]),
 )
 
 if (import.meta.main) {

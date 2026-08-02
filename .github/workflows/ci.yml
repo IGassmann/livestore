@@ -56,20 +56,6 @@ jobs:
           CHANGESET_BASE_REF: origin/${{ github.base_ref }}
       - name: Check changeset bodies
         run: pnpm run release:changeset:check-bodies
-  ruleset-drift-check:
-    runs-on: ubuntu-24.04
-    if: (github.event_name == 'workflow_dispatch' && !startsWith(github.ref_name,
-      'automation/release-')) || github.ref == 'refs/heads/main'
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
-      - name: Check repository ruleset drift
-        run: pnpm run github:rulesets:check
-        env:
-          GH_TOKEN: ${{ secrets.LIVESTORE_RULESET_ADMIN_TOKEN || github.token }}
   type-check:
     runs-on: ubuntu-24.04
     defaults:

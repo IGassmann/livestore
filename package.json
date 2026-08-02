@@ -53,7 +53,6 @@
     "examples:install": "bash scripts/bin/package-task examples:install",
     "examples:test": "bash scripts/bin/package-task examples:test",
     "examples:validate-links": "bash scripts/bin/package-task examples:validate-links",
-    "github:rulesets:check": "bash scripts/bin/package-task github:rulesets:check",
     "lint:check": "pnpm run lint:check:format && pnpm run lint:check:oxlint && pnpm run lint:check:lockfile",
     "lint:check:format": "oxfmt --check packages tests scripts docs .github",
     "lint:check:lockfile": "pnpm install --lockfile-only --frozen-lockfile",
