@@ -105,12 +105,6 @@ supportedArchitectures:
   cpu: [x64, arm64]
   libc: [glibc, musl]
 
-dedupePeerDependents: true
-
-strictPeerDependencies: false
-
-injectWorkspacePackages: false
-
 enableGlobalVirtualStore: true
 
 packageImportMethod: clone-or-copy
@@ -122,10 +116,6 @@ verifyDepsBeforeRun: false
 linkWorkspacePackages: true
 
 sideEffectsCache: false
-
-verifyStoreIntegrity: true
-
-strictStorePkgContentCheck: true
 
 pmOnFail: ignore
 
