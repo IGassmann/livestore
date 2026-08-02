@@ -16,7 +16,7 @@
     "docs:deploy:prod:phase:verify": "bash scripts/bin/package-task docs:deploy:prod:phase:verify",
     "docs:dev": "scripts/bin/mono docs dev",
     "docs:search:sync:prod": "bash scripts/bin/package-task docs:search:sync:prod",
-    "examples:build:src": "pnpm --dir examples --filter 'livestore-example-*' --workspace-concurrency=1 build",
+    "examples:build:src": "pnpm --filter './examples/**' run build",
     "examples:deploy": "scripts/bin/mono examples deploy",
     "examples:deploy:prod": "scripts/bin/mono examples deploy --prod",
     "examples:install": "pnpm install --frozen-lockfile --dir examples",
