@@ -213,12 +213,6 @@ case "$task" in
     ps -eo pid,ppid,etime,pcpu,pmem,comm,args > tmp/ci-docs/ps-full.log || true
     pgrep -af 'astro|chromium|chrome_crashpad_handler|node|mono' > tmp/ci-docs/pgrep-build-procs.log || true
     ;;
-  examples:install)
-    pnpm install --frozen-lockfile --dir examples "$@"
-    ;;
-  examples:build:src)
-    pnpm --dir examples --filter 'livestore-example-*' --workspace-concurrency=1 build "$@"
-    ;;
   release:snapshot:git-sha)
     if [[ -z "${GIT_SHA:-}" ]]; then
       echo "Error: GIT_SHA is required"
