@@ -19,7 +19,6 @@
     "examples:build:src": "pnpm --filter './examples/**' run build",
     "examples:deploy": "scripts/bin/mono examples deploy",
     "examples:deploy:prod": "scripts/bin/mono examples deploy --prod",
-    "examples:install": "pnpm install --frozen-lockfile --dir examples",
     "examples:test": "scripts/bin/mono examples test",
     "examples:validate-links": "scripts/bin/mono examples validate-links",
     "lint:check": "pnpm run lint:check:format && pnpm run lint:check:oxlint && pnpm run lint:check:lockfile",

@@ -212,8 +212,6 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
         with:
           playwright: 'true'
-      - name: Install examples dependencies
-        run: pnpm run examples:install
       - name: Build examples
         run: pnpm run examples:build:src
       - name: Test examples
