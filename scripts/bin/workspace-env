@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+workspace_root="${WORKSPACE_ROOT:-$(git rev-parse --show-toplevel)}"
+cd "$workspace_root"
+export WORKSPACE_ROOT="$workspace_root"
+export MONOREPO_ROOT="${MONOREPO_ROOT:-$workspace_root}"
+export PATH="$workspace_root/scripts/bin:$workspace_root/node_modules/.bin:$workspace_root/scripts/node_modules/.bin:$PATH"
+
+export OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}"
+export VITE_OTEL_EXPORTER_OTLP_ENDPOINT="${VITE_OTEL_EXPORTER_OTLP_ENDPOINT-$OTEL_EXPORTER_OTLP_ENDPOINT}"
+export OTEL_GRAFANA_URL="${OTEL_GRAFANA_URL:-http://localhost:30003}"
+export GRAFANA_ENDPOINT="${GRAFANA_ENDPOINT:-$OTEL_GRAFANA_URL}"
+export VITE_GRAFANA_ENDPOINT="${VITE_GRAFANA_ENDPOINT:-$GRAFANA_ENDPOINT}"
+export LS_DEV="${LS_DEV:-1}"
+export VITE_LS_DEV="${VITE_LS_DEV:-$LS_DEV}"
+export NODE_OPTIONS="${NODE_OPTIONS:---disable-warning=ExperimentalWarning}"
+
+resolve_playwright_chromium() {
+  local cache_root="${PLAYWRIGHT_BROWSERS_PATH:-}"
+  if [[ -z "$cache_root" ]]; then
+    case "$(uname -s)" in
+      Darwin) cache_root="$HOME/Library/Caches/ms-playwright" ;;
+      *) cache_root="$HOME/.cache/ms-playwright" ;;
+    esac
+  fi
+
+  for candidate in \
+    "$cache_root"/chromium-*/chrome-linux64/chrome \
+    "$cache_root"/chromium-*/chrome-linux/chrome \
+    "$cache_root"/chromium-*/chrome-mac-arm64/Google\ Chrome\ for\ Testing.app/Contents/MacOS/Google\ Chrome\ for\ Testing \
+    "$cache_root"/chromium-*/chrome-mac/Google\ Chrome\ for\ Testing.app/Contents/MacOS/Google\ Chrome\ for\ Testing \
+    "$cache_root"/chromium-*/chrome-win/chrome.exe
+  do
+    if [[ -x "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+if [[ -z "${PUPPETEER_EXECUTABLE_PATH:-}" ]]; then
+  if chromium_path="$(resolve_playwright_chromium)"; then
+    export PUPPETEER_EXECUTABLE_PATH="$chromium_path"
+  fi
+fi
+export PUPPETEER_SKIP_DOWNLOAD="${PUPPETEER_SKIP_DOWNLOAD:-1}"

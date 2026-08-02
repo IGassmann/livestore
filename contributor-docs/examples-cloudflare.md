@@ -12,7 +12,7 @@ The script uses the directory name inside `/examples` as the `<slug>` (for examp
 
 ## Prerequisites
 
-- Run commands through the root package scripts so `scripts/bin/package-task` sets workspace environment variables (including `WORKSPACE_ROOT`).
+- Run commands through the root package scripts so `scripts/bin/mono` sets workspace environment variables (including `WORKSPACE_ROOT`).
 - Authenticate with Cloudflare:
   ```bash
   pnpm --filter @livestore/utils-dev exec wrangler login

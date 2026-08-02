@@ -6,8 +6,6 @@ Install dependencies with `pnpm install`. The repository uses local package scri
 
 ## Tooling
 
-- Use root package scripts for task entrypoints. `scripts/bin/package-task` sets the workspace environment expected by the TypeScript `mono` CLI.
-
 - For dependency management see ./contributor-docs/dependency-management.md
 
 ### Package scripts and `mono` CLI

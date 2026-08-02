@@ -4,52 +4,8 @@ set -euo pipefail
 task="${1:?Usage: package-task <task-name> [args...]}"
 shift || true
 
-workspace_root="${WORKSPACE_ROOT:-$(git rev-parse --show-toplevel)}"
-cd "$workspace_root"
-export WORKSPACE_ROOT="$workspace_root"
-export MONOREPO_ROOT="${MONOREPO_ROOT:-$workspace_root}"
-export PATH="$workspace_root/scripts/bin:$workspace_root/node_modules/.bin:$workspace_root/scripts/node_modules/.bin:$PATH"
-
-export OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}"
-export VITE_OTEL_EXPORTER_OTLP_ENDPOINT="${VITE_OTEL_EXPORTER_OTLP_ENDPOINT-$OTEL_EXPORTER_OTLP_ENDPOINT}"
-export OTEL_GRAFANA_URL="${OTEL_GRAFANA_URL:-http://localhost:30003}"
-export GRAFANA_ENDPOINT="${GRAFANA_ENDPOINT:-$OTEL_GRAFANA_URL}"
-export VITE_GRAFANA_ENDPOINT="${VITE_GRAFANA_ENDPOINT:-$GRAFANA_ENDPOINT}"
-export LS_DEV="${LS_DEV:-1}"
-export VITE_LS_DEV="${VITE_LS_DEV:-$LS_DEV}"
-export NODE_OPTIONS="${NODE_OPTIONS:---disable-warning=ExperimentalWarning}"
-
-resolve_playwright_chromium() {
-  local cache_root="${PLAYWRIGHT_BROWSERS_PATH:-}"
-  if [[ -z "$cache_root" ]]; then
-    case "$(uname -s)" in
-      Darwin) cache_root="$HOME/Library/Caches/ms-playwright" ;;
-      *) cache_root="$HOME/.cache/ms-playwright" ;;
-    esac
-  fi
-
-  for candidate in \
-    "$cache_root"/chromium-*/chrome-linux64/chrome \
-    "$cache_root"/chromium-*/chrome-linux/chrome \
-    "$cache_root"/chromium-*/chrome-mac-arm64/Google\ Chrome\ for\ Testing.app/Contents/MacOS/Google\ Chrome\ for\ Testing \
-    "$cache_root"/chromium-*/chrome-mac/Google\ Chrome\ for\ Testing.app/Contents/MacOS/Google\ Chrome\ for\ Testing \
-    "$cache_root"/chromium-*/chrome-win/chrome.exe
-  do
-    if [[ -x "$candidate" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-if [[ -z "${PUPPETEER_EXECUTABLE_PATH:-}" ]]; then
-  if chromium_path="$(resolve_playwright_chromium)"; then
-    export PUPPETEER_EXECUTABLE_PATH="$chromium_path"
-  fi
-fi
-export PUPPETEER_SKIP_DOWNLOAD="${PUPPETEER_SKIP_DOWNLOAD:-1}"
+# shellcheck source=workspace-env
+source "$(dirname "$0")/workspace-env"
 
 devtools_artifact_verify() {
   artifact_args=(--manifest "${LIVESTORE_DEVTOOLS_MANIFEST:-release/devtools-artifact.json}")
@@ -183,21 +139,6 @@ devtools_artifact_certify_liveness() {
 }
 
 case "$task" in
-  docs:dev)
-    mono docs dev "$@"
-    ;;
-  docs:build)
-    mono docs build "$@"
-    ;;
-  docs:build:api)
-    mono docs build --api-docs "$@"
-    ;;
-  docs:deploy)
-    mono docs deploy "$@"
-    ;;
-  docs:deploy:prod)
-    mono docs deploy --prod --build --purge-cdn "$@"
-    ;;
   docs:deploy:prod:phase:build-deploy)
     mkdir -p tmp/ci-docs-prod
     export LIVESTORE_DOCS_SITE_URL="https://docs.livestore.dev"
@@ -272,18 +213,6 @@ case "$task" in
     ps -eo pid,ppid,etime,pcpu,pmem,comm,args > tmp/ci-docs/ps-full.log || true
     pgrep -af 'astro|chromium|chrome_crashpad_handler|node|mono' > tmp/ci-docs/pgrep-build-procs.log || true
     ;;
-  examples:test)
-    mono examples test "$@"
-    ;;
-  examples:deploy)
-    mono examples deploy "$@"
-    ;;
-  examples:deploy:prod)
-    mono examples deploy --prod "$@"
-    ;;
-  examples:validate-links)
-    mono examples validate-links "$@"
-    ;;
   examples:install)
     export npm_config_manage_package_manager_versions=false
     pnpm install --frozen-lockfile --dir examples "$@"
@@ -291,9 +220,6 @@ case "$task" in
   examples:build:src)
     export npm_config_manage_package_manager_versions=false
     pnpm --dir examples --filter 'livestore-example-*' --workspace-concurrency=1 build "$@"
-    ;;
-  release:snapshot)
-    mono release snapshot "$@"
     ;;
   release:snapshot:git-sha)
     if [[ -z "${GIT_SHA:-}" ]]; then
@@ -307,15 +233,6 @@ case "$task" in
     mono release plan \
       --release-version "$LIVESTORE_RELEASE_VERSION" \
       --npm-tag "${LIVESTORE_NPM_TAG:-latest}" "$@"
-    ;;
-  release:notes:extract)
-    mono release extract-release-notes "$@"
-    ;;
-  release:stable:dryrun)
-    mono release stable --dry-run --yes "$@"
-    ;;
-  release:stable:publish)
-    mono release stable --yes --allow-existing "$@"
     ;;
   release:devtools-artifact:verify)
     devtools_artifact_verify "$@"
