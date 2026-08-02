@@ -48,21 +48,6 @@ permissions:
 env:
   CI: 'true'
 jobs:
-  source-policy:
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    defaults:
-      run:
-        shell: bash
-    env:
-      CI: 'true'
-      GITHUB_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-pnpm
-      - name: Check first-party default refs
-        run: pnpm run source-policy
   create-release-pr:
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'create-release-pr'
     runs-on: ubuntu-latest

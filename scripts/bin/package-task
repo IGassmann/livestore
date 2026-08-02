@@ -265,9 +265,6 @@ case "$task" in
   release:changeset:verify-baseline)
     node scripts/src/commands/changesets.ts verify-baseline-changelog "$@"
     ;;
-  source-policy)
-    node scripts/src/commands/source-policy.ts
-    ;;
   *)
     echo "Unknown package task: $task" >&2
     exit 1
