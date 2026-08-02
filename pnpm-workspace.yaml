@@ -111,12 +111,3 @@ enableGlobalVirtualStore: true
 
 # Allow example apps to use published package versions but link to their local matching workspace packages instead of published releases.
 linkWorkspacePackages: true
-
-minimumReleaseAgeExclude:
-  - '@deno/darwin-arm64@2.9.2'
-  - '@deno/darwin-x64@2.9.2'
-  - '@deno/linux-arm64-glibc@2.9.2'
-  - '@deno/linux-x64-glibc@2.9.2'
-  - '@deno/win32-arm64@2.9.2'
-  - '@deno/win32-x64@2.9.2'
-  - deno@2.9.2
