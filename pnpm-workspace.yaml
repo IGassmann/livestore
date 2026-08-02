@@ -105,6 +105,8 @@ supportedArchitectures:
   cpu: [x64, arm64]
   libc: [glibc, musl]
 
+# Multiple agents use Git worktrees concurrently; avoid duplicating dependencies and make new worktrees fast to set up.
+# See https://pnpm.io/git-worktrees
 enableGlobalVirtualStore: true
 
 linkWorkspacePackages: true
