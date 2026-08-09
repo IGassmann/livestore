@@ -4,6 +4,13 @@ This fork imports selected changes from `livestorejs/livestore`. Changes are rev
 
 A normal `git merge` cannot be restricted to paths. This workflow instead starts an ancestry-only `ours` merge and three-way-applies a patch containing only the paths selected during review. The resulting commit records the upstream repository parent, so later synchronizations begin after the last reviewed upstream revision.
 
+This workflow has two separate human approval checkpoints:
+
+1. Select the paths to apply from the complete upstream delta.
+2. Review and curate the staged hunks after those paths have been applied.
+
+Path selection does not approve every hunk within those paths. Do not validate, commit, fast-forward, or push until the staged result has received explicit human approval at the second checkpoint.
+
 All commands use Fish shell.
 
 ## 1. Start a Synchronization Branch
@@ -58,6 +65,8 @@ The main purpose of this review is to identify the paths that should be imported
 
 Keep a list of the selected paths for the next step. Selection at this stage is path-based: a selected path is initially applied in full, and unwanted hunks can be removed during the later curation pass.
 
+**Human checkpoint 1:** Stop and obtain explicit confirmation of the selected path list before applying the patch. This confirmation authorizes only the initial path-level application; it does not replace the staged hunk review in step 4.
+
 ## 3. Apply the Selected Paths
 
 Start a pending merge whose initial tree is exactly the fork's tree:
@@ -108,7 +117,7 @@ git diff --name-only --diff-filter=U
 
 This command must print nothing.
 
-Review the staged result in WebStorm and curate the selected paths. Edit files to remove unwanted hunks and delete newly added files that should not be imported.
+Review the staged result in WebStorm and curate the selected paths. Edit files to remove unwanted hunks and delete newly added files that should not be imported. This review is required even when the patch applied cleanly and every selected path appears appropriate.
 
 When an existing file was modified or deleted upstream but the fork should retain its complete pre-merge version, restore it to `HEAD`:
 
@@ -135,7 +144,11 @@ Inspect the final path list and confirm that it contains only paths intentionall
 git diff --cached --name-only HEAD
 ```
 
+**Human checkpoint 2:** Stop and ask the reviewer to inspect the complete staged diff in WebStorm. Wait for explicit approval of the staged result before continuing to validation or commit. Approval of the path list from step 2 must never be inferred as approval of the staged hunks.
+
 ## 5. Validate and Commit
+
+Begin this step only after the reviewer has explicitly approved the staged result at human checkpoint 2.
 
 Run focused Vitest files for affected behavior, then the required repository checks:
 
