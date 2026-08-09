@@ -8,7 +8,14 @@ All commands use Fish shell.
 
 ## 1. Start a Synchronization Branch
 
-Begin with a clean worktree:
+Refresh both remote-tracking branches before inspecting repository state or calculating the upstream range. This avoids making synchronization decisions from stale local references:
+
+```fish
+git fetch origin --prune
+git fetch upstream --prune
+```
+
+Then begin with a clean worktree:
 
 ```fish
 git status --short --branch
@@ -19,11 +26,9 @@ git switch -c igor/chore/sync-upstream
 
 Use a unique branch suffix if that name already exists.
 
-Fetch and pin the upstream range:
+Pin the upstream range:
 
 ```fish
-git fetch upstream --prune
-
 set new_upstream (git rev-parse upstream/main)
 set old_upstream (git merge-base HEAD $new_upstream)
 
