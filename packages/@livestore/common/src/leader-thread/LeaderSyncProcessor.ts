@@ -27,10 +27,11 @@ import {
   TxQueue,
 } from '@livestore/utils/effect'
 
-import { MaterializeError, type SqliteDb, UnknownError } from '../adapter-types.ts'
+import { MaterializeError, UnknownError } from '../adapter-types.ts'
 import { PullItem } from '../ClientSessionLeaderThreadProxy.ts'
 import type { UnknownEventError } from '../errors.ts'
 import { IntentionalShutdownCause } from '../errors.ts'
+import * as EventlogSqliteDb from '../EventlogSqliteDb.ts'
 import * as MaterializationJournal from '../MaterializationJournal.ts'
 import { makeMaterializerHash } from '../materializer-helper.ts'
 import type { LiveStoreSchema } from '../schema/mod.ts'
@@ -38,6 +39,7 @@ import { EventSequenceNumber, LiveStoreEvent, resolveEventDef, SystemTables } fr
 import { EVENTLOG_META_TABLE, SYNC_STATUS_TABLE } from '../schema/state/sqlite/system-tables/eventlog-tables.ts'
 import * as SqliteDbHelper from '../sqlite-db-helper.ts'
 import * as StateHead from '../StateHead.ts'
+import * as StateSqliteDb from '../StateSqliteDb.ts'
 import type { BackendIdMismatchError, IsOfflineError, SyncBackend } from '../sync/sync.ts'
 import * as SyncState from '../sync/syncstate.ts'
 import { sql } from '../util.ts'
@@ -120,14 +122,17 @@ export interface Service {
   readonly boot: Effect.Effect<
     { initialLeaderHead: EventSequenceNumber.Client.Composite },
     never,
-    LeaderThreadCtx | Scope.Scope | HttpClient.HttpClient
+    | EventlogSqliteDb.EventlogSqliteDb
+    | LeaderThreadCtx
+    | Scope.Scope
+    | HttpClient.HttpClient
+    | StateSqliteDb.StateSqliteDb
   >
   readonly syncState: Subscribable.Subscribable<SyncState.SyncState>
 }
 
 interface Options {
   readonly schema: LiveStoreSchema
-  readonly dbState: SqliteDb
   readonly initialBlockingSyncContext: InitialBlockingSyncContext
   /** Initial sync state rehydrated from the persisted eventlog or initial sync state */
   readonly initialSyncState: SyncState.SyncState
@@ -206,7 +211,6 @@ interface Options {
 
 export const make = Effect.fnUntraced(function* ({
   schema,
-  dbState,
   initialBlockingSyncContext,
   initialSyncState,
   onError,
@@ -215,6 +219,7 @@ export const make = Effect.fnUntraced(function* ({
   params,
   testing,
 }: Options) {
+  const dbState = yield* StateSqliteDb.StateSqliteDb
   const materializationJournal = yield* MaterializationJournal.MaterializationJournal
   const stateHead = yield* StateHead.StateHead
   const syncBackendPushQueue = yield* TxQueue.unbounded<LiveStoreEvent.Client.EncodedWithMeta>()
@@ -235,7 +240,7 @@ export const make = Effect.fnUntraced(function* ({
       | {
           span: Tracer.Span
           devtoolsLatch: Latch.Latch | undefined
-          services: Context.Context<LeaderThreadCtx>
+          services: Context.Context<EventlogSqliteDb.EventlogSqliteDb | LeaderThreadCtx | StateSqliteDb.StateSqliteDb>
         },
   }
 
@@ -463,9 +468,15 @@ export const make = Effect.fnUntraced(function* ({
   }: {
     restartBackendPushing: (
       filteredRebasedPending: ReadonlyArray<LiveStoreEvent.Client.EncodedWithMeta>,
-    ) => Effect.Effect<void, never, LeaderThreadCtx | HttpClient.HttpClient>
+    ) => Effect.Effect<
+      void,
+      never,
+      EventlogSqliteDb.EventlogSqliteDb | LeaderThreadCtx | HttpClient.HttpClient | StateSqliteDb.StateSqliteDb
+    >
   }) {
-    const { syncBackend, dbState: db, dbEventlog, schema } = yield* LeaderThreadCtx
+    const dbState = yield* StateSqliteDb.StateSqliteDb
+    const dbEventlog = yield* EventlogSqliteDb.EventlogSqliteDb
+    const { syncBackend, schema } = yield* LeaderThreadCtx
 
     if (syncBackend === undefined) return
 
@@ -548,7 +559,7 @@ export const make = Effect.fnUntraced(function* ({
                 yield* materializationJournal.rollback(rollbackSeqNums)
                 yield* stateHead.set(headAfterRollback)
               }).pipe(
-                SqliteDbHelper.withSavepoint(db),
+                SqliteDbHelper.withSavepoint(dbState),
                 Effect.mapError((cause) =>
                   MaterializationJournal.isMaterializationJournalError(cause) === true
                     ? cause
@@ -763,7 +774,9 @@ export const make = Effect.fnUntraced(function* ({
     boot: Effect.gen(function* () {
       const span = yield* Effect.currentSpan.pipe(Effect.orDie)
       const { devtools, shutdownChannel } = yield* LeaderThreadCtx
-      const services = yield* Effect.context<LeaderThreadCtx>()
+      const services = yield* Effect.context<
+        EventlogSqliteDb.EventlogSqliteDb | LeaderThreadCtx | StateSqliteDb.StateSqliteDb
+      >()
 
       ctxRef.current = {
         span,
@@ -929,15 +942,21 @@ export const layer = (options: Options) => Layer.effect(LeaderSyncProcessor, mak
 
 type MaterializeEventsBatch = (_: {
   batchItems: ReadonlyArray<LiveStoreEvent.Client.EncodedWithMeta>
-}) => Effect.Effect<void, MaterializeError | MaterializationJournal.MaterializationJournalError, LeaderThreadCtx>
+}) => Effect.Effect<
+  void,
+  MaterializeError | MaterializationJournal.MaterializationJournalError,
+  EventlogSqliteDb.EventlogSqliteDb | LeaderThreadCtx | StateSqliteDb.StateSqliteDb
+>
 
 // TODO how to handle errors gracefully
 const materializeEventsBatch: MaterializeEventsBatch = ({ batchItems }) =>
   Effect.gen(function* () {
-    const { dbState: db, dbEventlog, materializeEvent } = yield* LeaderThreadCtx
+    const dbState = yield* StateSqliteDb.StateSqliteDb
+    const dbEventlog = yield* EventlogSqliteDb.EventlogSqliteDb
+    const { materializeEvent } = yield* LeaderThreadCtx
 
     // NOTE We always start a transaction to ensure consistency between db and eventlog (even for single-item batches)
-    db.execute('BEGIN TRANSACTION', undefined) // Start the transaction
+    dbState.execute('BEGIN TRANSACTION', undefined) // Start the transaction
     dbEventlog.execute('BEGIN TRANSACTION', undefined) // Start the transaction
 
     yield* Effect.addFinalizer((exit) =>
@@ -945,7 +964,7 @@ const materializeEventsBatch: MaterializeEventsBatch = ({ batchItems }) =>
         if (Exit.isSuccess(exit) === true) return
 
         // Rollback in case of an error
-        db.execute('ROLLBACK', undefined)
+        dbState.execute('ROLLBACK', undefined)
         dbEventlog.execute('ROLLBACK', undefined)
       }),
     )
@@ -955,7 +974,7 @@ const materializeEventsBatch: MaterializeEventsBatch = ({ batchItems }) =>
       batchItems[i]!.meta.materializerHashLeader = hash
     }
 
-    db.execute('COMMIT', undefined) // Commit the transaction
+    dbState.execute('COMMIT', undefined) // Commit the transaction
     dbEventlog.execute('COMMIT', undefined) // Commit the transaction
   }).pipe(
     Effect.uninterruptible,
@@ -1179,8 +1198,6 @@ const handleBackendIdMismatch = Effect.fn('@livestore/common:LeaderSyncProcessor
   onBackendIdMismatch: 'reset' | 'shutdown' | 'ignore'
   shutdownChannel: ShutdownChannel
 }) {
-  const { dbEventlog, dbState } = yield* LeaderThreadCtx
-
   if (onBackendIdMismatch === 'reset') {
     yield* Effect.logWarning(
       'Sync backend identity changed (backend was reset). Clearing local storage and shutting down.',
@@ -1188,7 +1205,7 @@ const handleBackendIdMismatch = Effect.fn('@livestore/common:LeaderSyncProcessor
     )
 
     // Clear local databases so the client can start fresh on next boot
-    yield* clearLocalDatabases({ dbEventlog, dbState })
+    yield* clearLocalDatabases
 
     // Send shutdown signal with special reason
     yield* shutdownChannel.send(IntentionalShutdownCause.make({ reason: 'backend-id-mismatch' })).pipe(Effect.orDie)
@@ -1220,8 +1237,11 @@ const handleBackendIdMismatch = Effect.fn('@livestore/common:LeaderSyncProcessor
  * Clears local databases (eventlog and state) so the client can start fresh on next boot.
  * This is used when the sync backend identity has changed (i.e. backend was reset).
  */
-const clearLocalDatabases = ({ dbEventlog, dbState }: { dbEventlog: SqliteDb; dbState: SqliteDb }) =>
-  Effect.sync(() => {
+const clearLocalDatabases = Effect.gen(function* () {
+  const dbState = yield* StateSqliteDb.StateSqliteDb
+  const dbEventlog = yield* EventlogSqliteDb.EventlogSqliteDb
+
+  yield* Effect.sync(() => {
     // Clear eventlog tables
     dbEventlog.execute(sql`DELETE FROM ${EVENTLOG_META_TABLE}`)
     dbEventlog.execute(sql`DELETE FROM ${SYNC_STATUS_TABLE}`)
@@ -1234,6 +1254,7 @@ const clearLocalDatabases = ({ dbEventlog, dbState }: { dbEventlog: SqliteDb; db
       dbState.execute(`DROP TABLE IF EXISTS "${name}"`)
     }
   })
+})
 
 const snapshotTxQueue = <A>(queue: TxQueue.TxQueue<A>): Effect.Effect<ReadonlyArray<A>> =>
   Effect.tx(

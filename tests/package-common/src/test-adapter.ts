@@ -1,12 +1,14 @@
 import {
   type Adapter,
   ClientSessionLeaderThreadProxy,
+  EventlogSqliteDb,
   type LockStatus,
   type MakeSqliteDb,
   makeClientSession,
   MaterializationJournal,
   migrateDb,
   type SqliteDb,
+  StateSqliteDb,
   StateHead,
   type SyncOptions,
   UnknownError,
@@ -162,6 +164,10 @@ const makeLocalLeaderThread = ({
     }
 
     const [dbState, dbEventlog] = yield* Effect.all([makeDb('state'), makeDb('eventlog')], { concurrency: 2 })
+    const sqliteDbLayer = Layer.mergeAll(StateSqliteDb.layer(dbState), EventlogSqliteDb.layer(dbEventlog))
+    const stateServicesLayer = Layer.mergeAll(StateHead.layer, MaterializationJournal.layer).pipe(
+      Layer.provide(sqliteDbLayer),
+    )
 
     const layer = yield* Layer.build(
       makeLeaderThreadLayer({
@@ -170,18 +176,15 @@ const makeLocalLeaderThread = ({
         clientId,
         makeSqliteDb,
         syncOptions,
-        dbState,
-        dbEventlog,
         devtoolsOptions: { enabled: false },
         shutdownChannel,
         syncPayloadEncoded,
         syncPayloadSchema,
-      }).pipe(Layer.provide(Layer.mergeAll(StateHead.layer({ dbState }), MaterializationJournal.layer({ dbState })))),
+      }).pipe(Layer.provide(Layer.mergeAll(sqliteDbLayer, stateServicesLayer))),
     )
 
     return yield* Effect.gen(function* () {
-      const { dbState, dbEventlog, syncProcessor, extraIncomingMessagesQueue, initialState, networkStatus } =
-        yield* LeaderThreadCtx
+      const { syncProcessor, extraIncomingMessagesQueue, initialState, networkStatus } = yield* LeaderThreadCtx
 
       const initialLeaderHead = Eventlog.getClientHeadFromDb(dbEventlog)
 

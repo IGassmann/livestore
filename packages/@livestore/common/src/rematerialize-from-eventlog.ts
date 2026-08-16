@@ -1,7 +1,8 @@
 import { memoizeByRef } from '@livestore/utils'
 import { Effect, Option, ReadonlyArray as EffectArray, Schema, Stream } from '@livestore/utils/effect'
 
-import { type SqliteDb, UnknownError } from './adapter-types.ts'
+import { UnknownError } from './adapter-types.ts'
+import * as EventlogSqliteDb from './EventlogSqliteDb.ts'
 import type { MaterializeEvent } from './leader-thread/mod.ts'
 import type { EventDef, LiveStoreSchema } from './schema/mod.ts'
 import { EventSequenceNumber, LiveStoreEvent, SystemTables } from './schema/mod.ts'
@@ -12,19 +13,18 @@ import { sql } from './util.ts'
 const jsonParse = Schema.decodeUnknownSync(Schema.UnknownFromJsonString)
 
 export const rematerializeFromEventlog = Effect.fn('@livestore/common:rematerializeFromEventlog')(function* ({
-  dbEventlog,
   // TODO re-use this db when bringing back the boot in-memory db implementation
   // db,
   schema,
   onProgress,
   materializeEvent,
 }: {
-  dbEventlog: SqliteDb
   // db: SqliteDb
   schema: LiveStoreSchema
   onProgress: (_: { done: number; total: number }) => Effect.Effect<void>
   materializeEvent: MaterializeEvent
 }) {
+  const dbEventlog = yield* EventlogSqliteDb.EventlogSqliteDb
   const eventsCount = dbEventlog.select<{ count: number }>(
     `SELECT COUNT(*) AS count FROM ${SystemTables.EVENTLOG_META_TABLE}`,
   )[0]!.count

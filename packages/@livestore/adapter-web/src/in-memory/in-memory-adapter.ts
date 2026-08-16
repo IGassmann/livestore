@@ -2,10 +2,12 @@ import {
   type Adapter,
   ClientSessionLeaderThreadProxy,
   Devtools,
+  EventlogSqliteDb,
   type LockStatus,
   makeClientSession,
   MaterializationJournal,
   migrateDb,
+  StateSqliteDb,
   StateHead,
   type SyncOptions,
   UnknownError,
@@ -261,6 +263,11 @@ const makeLeaderThread = ({
       clientId,
     })
 
+    const sqliteDbLayer = Layer.mergeAll(StateSqliteDb.layer(dbState), EventlogSqliteDb.layer(dbEventlog))
+    const stateServicesLayer = Layer.mergeAll(StateHead.layer, MaterializationJournal.layer).pipe(
+      Layer.provide(sqliteDbLayer),
+    )
+
     const layer = yield* Layer.build(
       makeLeaderThreadLayer({
         schema,
@@ -268,18 +275,15 @@ const makeLeaderThread = ({
         clientId,
         makeSqliteDb,
         syncOptions,
-        dbState,
-        dbEventlog,
         devtoolsOptions,
         shutdownChannel,
         syncPayloadEncoded,
         syncPayloadSchema: syncPayloadSchema as Schema.Decoder<Schema.Json, never> | undefined,
-      }).pipe(Layer.provide(Layer.mergeAll(StateHead.layer({ dbState }), MaterializationJournal.layer({ dbState })))),
+      }).pipe(Layer.provide(Layer.mergeAll(sqliteDbLayer, stateServicesLayer))),
     )
 
     return yield* Effect.gen(function* () {
-      const { dbState, dbEventlog, syncProcessor, extraIncomingMessagesQueue, initialState, networkStatus } =
-        yield* LeaderThreadCtx
+      const { syncProcessor, extraIncomingMessagesQueue, initialState, networkStatus } = yield* LeaderThreadCtx
 
       const initialLeaderHead = Eventlog.getClientHeadFromDb(dbEventlog)
 

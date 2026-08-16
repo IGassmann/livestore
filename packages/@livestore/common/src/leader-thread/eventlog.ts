@@ -2,6 +2,7 @@ import { LS_DEV, shouldNeverHappen } from '@livestore/utils'
 import { Effect, Option, ReadonlyArray, Schema } from '@livestore/utils/effect'
 
 import type { SqliteDb } from '../adapter-types.ts'
+import * as EventlogSqliteDb from '../EventlogSqliteDb.ts'
 import { migrateTable } from '../schema-management/migrations.ts'
 import * as EventSequenceNumber from '../schema/EventSequenceNumber/mod.ts'
 import * as LiveStoreEvent from '../schema/LiveStoreEvent/mod.ts'
@@ -17,7 +18,7 @@ import type { PreparedBindValues } from '../util.ts'
 import { sql } from '../util.ts'
 import { execSql } from './connection.ts'
 import type { InitialSyncInfo, StreamEventsOptions } from './types.ts'
-import { LeaderThreadCtx, STREAM_EVENTS_BATCH_SIZE_DEFAULT } from './types.ts'
+import { STREAM_EVENTS_BATCH_SIZE_DEFAULT } from './types.ts'
 
 export const initEventlogDb = (dbEventlog: SqliteDb) =>
   Effect.gen(function* () {
@@ -268,7 +269,7 @@ export const insertIntoEventlog = (
 
 export const updateSyncMetadata = (items: ReadonlyArray<LiveStoreEvent.Client.EncodedWithMeta>) =>
   Effect.gen(function* () {
-    const { dbEventlog } = yield* LeaderThreadCtx
+    const dbEventlog = yield* EventlogSqliteDb.EventlogSqliteDb
 
     // TODO try to do this in a single query
     for (let i = 0; i < items.length; i++) {
@@ -288,7 +289,7 @@ export const updateSyncMetadata = (items: ReadonlyArray<LiveStoreEvent.Client.En
 
 export const getSyncBackendCursorInfo = ({ remoteHead }: { remoteHead: EventSequenceNumber.Global.Type }) =>
   Effect.gen(function* () {
-    const { dbEventlog } = yield* LeaderThreadCtx
+    const dbEventlog = yield* EventlogSqliteDb.EventlogSqliteDb
 
     if (remoteHead === EventSequenceNumber.Client.ROOT.global) return Option.none()
 
